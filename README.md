@@ -66,7 +66,7 @@ chain-sdk（本仓库：锚定读、锚定写、参与方查询、DID 解析、�
 |---|---|---|
 | `Mock` | 内存读；无 `KeyVault`；断言签名返回 `SignerUnavailable` | 内存读写；两类密钥 |
 | `Centralized` | HTTP 只读；无 `KeyVault` | HTTP 读写；链账户签名 + did:web 断言签名 |
-| `Chain` | `subxt` storage 只读；无 `KeyVault` | `subxt` 读写；sr25519 签 extrinsic + ed25519 签断言 |
+| `Chain` | 连接/健康/事件/角色拦截；storage 查询 POC 返回 `Unsupported`；无 `KeyVault` | 上述能力 + 写操作角色拦截；extrinsic 提交 POC 返回 `Unsupported`（两类签名原语已实现） |
 
 **越权行为（三后端一致）**：
 
@@ -232,7 +232,7 @@ chain-sdk/
 │   ├── chain.rs          # Chain 后端（subxt）
 │   └── sd.rs             # SD-JWT 签发/验证
 ├── examples/mini_cli.rs
-├── tests/                # 16 个验收测试文件 + fixtures
+├── tests/                # 17 个验收测试文件 + fixtures
 ├── configs/chain-sdk.toml.example
 ├── scripts/{build-rust-musl,run-consistency,verify-roles}.sh
 ├── .github/workflows/{ci,rust-musl,consistency,roles}.yml
