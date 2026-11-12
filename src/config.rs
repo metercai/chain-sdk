@@ -1,19 +1,23 @@
-//! 配置模型、默认值、覆盖项与 SDK 工厂入口。
+//! 配置模型、解析与 SDK 工厂。
 //!
-//! 优先级（P0 实现）：显式 [`ConfigOverrides`] > 环境变量 > TOML 文件 > 内置默认值。
-//! 密钥库密码单独一条链（仅 `role = Issuer` 时解析）：
-//! `CHAIN_KEYSTORE_PASSWORD` → `password_file` → `allow_auto_generate_password`
-//! 自动生成 → 报错。
+//! 优先级：显式 [`ConfigOverrides`] > 环境变量 > TOML 文件 > 内置默认值。
+//! 密码单独一条链（仅 `role = Issuer` 且 `scheme = "file-keystore"` 时解析）：
+//! `password_env` → `password_file` → `allow_auto_generate_password` → 报错。
 //!
-//! TOML 各段与结构体的对应关系见 `docs/implementation-plan.md` 附录 B。
+//! TOML 使用嵌套段（`[chain_sdk.key_vault]`、`[chain_sdk.centralized]` 等），
+//! 由内部 `FileConfig` 映射到扁平的 [`ChainSdkConfig`]。完整算法见
+//! `docs/implementation-plan.md` 附录 B。
 
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 
+use keyvault_core::{FileKeystore, KeyVault, MemoryKeystore, PasswordSource, resolve_password};
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 
-use crate::{ChainSdk, ChainSdkError};
+use crate::error::map_vault_err;
+use crate::{ChainSdk, ChainSdkError, SdkCore};
 
 /// 后端模式。切换需要重启进程。
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -22,7 +26,7 @@ pub enum ChainSdkMode {
     /// 进程内 Mock（无外部依赖）。
     #[default]
     Mock,
-    /// 中心化模拟链（HTTP）。
+    /// 中心化模拟链（HTTP + WebSocket）。
     Centralized,
     /// 真实 Substrate 链（subxt）。
     Chain,
@@ -35,6 +39,17 @@ impl ChainSdkMode {
             Self::Mock => "mock",
             Self::Centralized => "centralized",
             Self::Chain => "chain",
+        }
+    }
+
+    fn parse(value: &str) -> Result<Self, ChainSdkError> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "mock" => Ok(Self::Mock),
+            "centralized" => Ok(Self::Centralized),
+            "chain" => Ok(Self::Chain),
+            other => Err(ChainSdkError::ConfigError(format!(
+                "mode expects mock|centralized|chain, got {other}"
+            ))),
         }
     }
 }
@@ -64,6 +79,16 @@ impl SdkRole {
     pub fn has_issuer_signing(self) -> bool {
         self.needs_keyvault()
     }
+
+    fn parse(value: &str) -> Result<Self, ChainSdkError> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "verifier" => Ok(Self::Verifier),
+            "issuer" | "app" => Ok(Self::Issuer),
+            other => Err(ChainSdkError::ConfigError(format!(
+                "role expects verifier|issuer|app, got {other}"
+            ))),
+        }
+    }
 }
 
 /// 两类服务端密钥的 `KeyId`。
@@ -73,9 +98,9 @@ impl SdkRole {
 /// - `participant_did` 必须以 `participant-did/` 开头（ed25519）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KeyVaultKeys {
-    /// 链账户密钥（sr25519），如 `chain-account/operator-1`。
+    /// 链账户密钥（sr25519），例如 `chain-account/5GrwvaEF...`。
     pub operator: String,
-    /// 参与方 did:web 密钥（ed25519），如 `participant-did/did_web_example_com`。
+    /// 参与方 did:web 密钥（ed25519），例如 `participant-did/did_key_z6Mk...`。
     pub participant_did: String,
 }
 
@@ -134,7 +159,7 @@ pub struct ParticipantConfig {
 /// `did-sdk<Server>` 装配参数。
 ///
 /// VC 存储与 Disclosures 存储均由 `did-sdk` 管理（S17）；`chain-sdk` 只提供
-/// 目录与密码来源，不读取、不写入 VC 文件。
+/// 目录，不读取、不写入 VC 文件。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DidConfig {
@@ -306,22 +331,471 @@ pub fn home_dir() -> PathBuf {
         .join("chain-sdk")
 }
 
-/// 解析配置（P0 实现；当前为初始化占位）。
-///
-/// 完整算法见 `docs/implementation-plan.md` 附录 B。
-pub fn resolve_config(overrides: ConfigOverrides) -> Result<ChainSdkConfig, ChainSdkError> {
-    let _ = overrides;
-    Err(ChainSdkError::ConfigError(
-        "resolve_config 尚未实现：初始化骨架，按实施文档 P0 落地".into(),
-    ))
+// ===== TOML 文件模型（全 Option，便于部分覆盖） =====
+
+#[derive(Debug, Default, Deserialize)]
+struct FileConfig {
+    chain_sdk: Option<FileSection>,
 }
 
-/// 按配置构造 `Arc<dyn ChainSdk>`（P0 实现；当前为初始化占位）。
+#[derive(Debug, Default, Deserialize)]
+struct FileSection {
+    mode: Option<String>,
+    role: Option<String>,
+    participant_id: Option<u32>,
+    cache_ttl_secs: Option<u64>,
+    valid_until_refresh_window_secs: Option<u64>,
+    require_finalized_node: Option<bool>,
+    key_vault: Option<FileKeyVault>,
+    participant: Option<FileParticipant>,
+    did: Option<FileDid>,
+    mock: Option<FileMock>,
+    capabilities: Option<FileCapabilities>,
+    centralized: Option<FileEndpoint>,
+    chain: Option<FileChainSection>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct FileKeyVault {
+    scheme: Option<String>,
+    path: Option<PathBuf>,
+    password_env: Option<String>,
+    password_file: Option<PathBuf>,
+    allow_auto_generate_password: Option<bool>,
+    keys: Option<FileKeys>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct FileKeys {
+    operator: Option<String>,
+    participant_did: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct FileParticipant {
+    controller_did: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct FileDid {
+    vc_storage_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct FileMock {
+    state_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct FileCapabilities {
+    did_resolution: Option<bool>,
+    vc_wallet: Option<bool>,
+    issuer_signing: Option<bool>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct FileEndpoint {
+    endpoint: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct FileChainSection {
+    endpoint: Option<String>,
+    require_finalized_node: Option<bool>,
+}
+
+fn apply_file(config: &mut ChainSdkConfig) -> Result<(), ChainSdkError> {
+    let explicit = std::env::var("CHAIN_SDK_CONFIG_FILE")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from);
+    let path = explicit
+        .clone()
+        .unwrap_or_else(|| home_dir().join("chain-sdk.toml"));
+    if !path.exists() {
+        if explicit.is_some() {
+            return Err(ChainSdkError::ConfigError(format!(
+                "config file not found: {}",
+                path.display()
+            )));
+        }
+        return Ok(());
+    }
+    let raw = std::fs::read_to_string(&path)
+        .map_err(|error| ChainSdkError::ConfigError(format!("read {}: {error}", path.display())))?;
+    let file: FileConfig = toml::from_str(&raw).map_err(|error| {
+        ChainSdkError::ConfigError(format!("parse {}: {error}", path.display()))
+    })?;
+    let Some(section) = file.chain_sdk else {
+        return Ok(());
+    };
+    if let Some(mode) = section.mode {
+        config.mode = ChainSdkMode::parse(&mode)?;
+    }
+    if let Some(role) = section.role {
+        config.role = SdkRole::parse(&role)?;
+    }
+    if let Some(value) = section.participant_id {
+        config.participant_id = value;
+    }
+    if let Some(value) = section.cache_ttl_secs {
+        config.cache_ttl_secs = value;
+    }
+    if let Some(value) = section.valid_until_refresh_window_secs {
+        config.valid_until_refresh_window_secs = value;
+    }
+    if let Some(value) = section.require_finalized_node {
+        config.require_finalized_node = value;
+    }
+    if let Some(kv) = section.key_vault {
+        if let Some(value) = kv.scheme {
+            config.key_vault.scheme = value;
+        }
+        if let Some(value) = kv.path {
+            config.key_vault.path = value;
+        }
+        if let Some(value) = kv.password_env {
+            config.key_vault.password_env = value;
+        }
+        if let Some(value) = kv.password_file {
+            config.key_vault.password_file = value;
+        }
+        if let Some(value) = kv.allow_auto_generate_password {
+            config.key_vault.allow_auto_generate_password = value;
+        }
+        if let Some(keys) = kv.keys {
+            if let Some(value) = keys.operator {
+                config.key_vault.keys.operator = value;
+            }
+            if let Some(value) = keys.participant_did {
+                config.key_vault.keys.participant_did = value;
+            }
+        }
+    }
+    if let Some(participant) = section.participant {
+        if let Some(value) = participant.controller_did {
+            config.participant.controller_did = value;
+        }
+    }
+    if let Some(did) = section.did {
+        if let Some(value) = did.vc_storage_path {
+            config.did.vc_storage_path = value;
+        }
+    }
+    if let Some(mock) = section.mock {
+        if let Some(value) = mock.state_path {
+            config.mock.state_path = Some(value);
+        }
+    }
+    if let Some(capabilities) = section.capabilities {
+        if let Some(value) = capabilities.did_resolution {
+            config.capabilities.did_resolution = value;
+        }
+        if let Some(value) = capabilities.vc_wallet {
+            config.capabilities.vc_wallet = value;
+        }
+        if let Some(value) = capabilities.issuer_signing {
+            config.capabilities.issuer_signing = value;
+        }
+    }
+    if let Some(endpoint) = section.centralized.and_then(|value| value.endpoint) {
+        config.centralized_endpoint = endpoint;
+    }
+    if let Some(chain) = section.chain {
+        if let Some(value) = chain.endpoint {
+            config.chain_endpoint = value;
+        }
+        if let Some(value) = chain.require_finalized_node {
+            config.require_finalized_node = value;
+        }
+    }
+    Ok(())
+}
+
+fn env_string(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+}
+
+fn env_parse<T>(name: &str) -> Result<Option<T>, ChainSdkError>
+where
+    T: FromStr,
+    T::Err: std::fmt::Display,
+{
+    match env_string(name) {
+        Some(value) => value.parse::<T>().map(Some).map_err(|error| {
+            ChainSdkError::ConfigError(format!("{name} expects a valid value: {error}"))
+        }),
+        None => Ok(None),
+    }
+}
+
+fn env_bool(name: &str) -> Result<Option<bool>, ChainSdkError> {
+    let Some(value) = env_string(name) else {
+        return Ok(None);
+    };
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Ok(Some(true)),
+        "0" | "false" | "no" | "off" => Ok(Some(false)),
+        other => Err(ChainSdkError::ConfigError(format!(
+            "{name} expects bool, got {other}"
+        ))),
+    }
+}
+
+fn apply_env(config: &mut ChainSdkConfig) -> Result<(), ChainSdkError> {
+    if let Some(value) = env_string("CHAIN_SDK_MODE") {
+        config.mode = ChainSdkMode::parse(&value)?;
+    }
+    if let Some(value) = env_string("CHAIN_SDK_ROLE") {
+        config.role = SdkRole::parse(&value)?;
+    }
+    if let Some(value) = env_parse::<u32>("CHAIN_SDK_PARTICIPANT_ID")? {
+        config.participant_id = value;
+    }
+    if let Some(value) = env_string("CHAIN_SDK_CONTROLLER_DID") {
+        config.participant.controller_did = value;
+    }
+    if let Some(value) = env_string("CHAIN_SDK_KEYVAULT_SCHEME") {
+        config.key_vault.scheme = value;
+    }
+    if let Some(value) = env_string("CHAIN_SDK_KEYVAULT_PATH") {
+        config.key_vault.path = PathBuf::from(value);
+    }
+    if let Some(value) = env_string("CHAIN_SDK_KEYVAULT_PASSWORD_FILE") {
+        config.key_vault.password_file = PathBuf::from(value);
+    }
+    if let Some(value) = env_string("CHAIN_SDK_OPERATOR_KEY_ID") {
+        config.key_vault.keys.operator = value;
+    }
+    if let Some(value) = env_string("CHAIN_SDK_PARTICIPANT_DID_KEY_ID") {
+        config.key_vault.keys.participant_did = value;
+    }
+    if let Some(value) = env_bool("CHAIN_SDK_VC_WALLET")? {
+        config.capabilities.vc_wallet = value;
+    }
+    if let Some(value) = env_bool("CHAIN_SDK_ISSUER_SIGNING")? {
+        config.capabilities.issuer_signing = value;
+    }
+    if let Some(value) = env_string("CHAIN_SDK_CENTRALIZED_ENDPOINT") {
+        config.centralized_endpoint = value;
+    }
+    if let Some(value) = env_string("CHAIN_SDK_CHAIN_ENDPOINT") {
+        config.chain_endpoint = value;
+    }
+    if let Some(value) = env_bool("CHAIN_SDK_REQUIRE_FINALIZED")? {
+        config.require_finalized_node = value;
+    }
+    if let Some(value) = env_parse::<u64>("CHAIN_SDK_CACHE_TTL_SECS")? {
+        config.cache_ttl_secs = value;
+    }
+    if let Some(value) = env_string("CHAIN_SDK_DID_VC_STORAGE_PATH") {
+        config.did.vc_storage_path = PathBuf::from(value);
+    }
+    if let Some(value) = env_string("CHAIN_SDK_MOCK_STATE_PATH") {
+        config.mock.state_path = Some(PathBuf::from(value));
+    }
+    Ok(())
+}
+
+fn apply_overrides(config: &mut ChainSdkConfig, overrides: ConfigOverrides) {
+    if let Some(value) = overrides.mode.as_deref() {
+        // 非法值在 apply 阶段无法返回；由 resolve_config 预先校验。
+        if let Ok(mode) = ChainSdkMode::parse(value) {
+            config.mode = mode;
+        }
+    }
+    if let Some(value) = overrides.role.as_deref() {
+        if let Ok(role) = SdkRole::parse(value) {
+            config.role = role;
+        }
+    }
+    if let Some(value) = overrides.participant_id {
+        config.participant_id = value;
+    }
+    if let Some(value) = overrides.controller_did {
+        config.participant.controller_did = value;
+    }
+    if let Some(value) = overrides.key_vault_scheme {
+        config.key_vault.scheme = value;
+    }
+    if let Some(value) = overrides.key_vault_path {
+        config.key_vault.path = value;
+    }
+    if let Some(value) = overrides.key_vault_password {
+        config.resolved_password = Some(SecretString::from(value));
+    }
+    if let Some(value) = overrides.key_vault_password_file {
+        config.key_vault.password_file = value;
+    }
+    if let Some(value) = overrides.operator_key_id {
+        config.key_vault.keys.operator = value;
+    }
+    if let Some(value) = overrides.participant_did_key_id {
+        config.key_vault.keys.participant_did = value;
+    }
+    if let Some(value) = overrides.vc_wallet {
+        config.capabilities.vc_wallet = value;
+    }
+    if let Some(value) = overrides.issuer_signing {
+        config.capabilities.issuer_signing = value;
+    }
+    if let Some(value) = overrides.centralized_endpoint {
+        config.centralized_endpoint = value;
+    }
+    if let Some(value) = overrides.chain_endpoint {
+        config.chain_endpoint = value;
+    }
+    if let Some(value) = overrides.require_finalized_node {
+        config.require_finalized_node = value;
+    }
+    if let Some(value) = overrides.cache_ttl_secs {
+        config.cache_ttl_secs = value;
+    }
+    if let Some(value) = overrides.did_vc_storage_path {
+        config.did.vc_storage_path = value;
+    }
+    if let Some(value) = overrides.mock_state_path {
+        config.mock.state_path = Some(value);
+    }
+}
+
+/// 解析配置。
 ///
-/// Issuer 会加载 `KeyVault` 与两类密钥；Verifier 不加载 `KeyVault`（S17）。
+/// 完整算法见 `docs/implementation-plan.md` 附录 B。Issuer 在
+/// `scheme = "file-keystore"` 时会解析密码；`memory-keystore` 不需要密码。
+pub fn resolve_config(overrides: ConfigOverrides) -> Result<ChainSdkConfig, ChainSdkError> {
+    // 先校验 override 中的枚举值，避免被 apply_overrides 静默忽略。
+    if let Some(value) = overrides.mode.as_deref() {
+        ChainSdkMode::parse(value)?;
+    }
+    if let Some(value) = overrides.role.as_deref() {
+        SdkRole::parse(value)?;
+    }
+
+    let mut config = ChainSdkConfig::default();
+    apply_file(&mut config)?;
+    apply_env(&mut config)?;
+    apply_overrides(&mut config, overrides);
+
+    config.capabilities = config.capabilities.effective_for(config.role);
+
+    if config.role.needs_keyvault() {
+        crate::keys::validate_configured_keys(&config.key_vault.keys)?;
+        if config.key_vault.scheme == "file-keystore" && config.resolved_password.is_none() {
+            config.resolved_password = Some(resolve_keyvault_password(&config.key_vault)?);
+        }
+    } else {
+        config.resolved_password = None;
+    }
+
+    validate_for_build(&config)?;
+    Ok(config)
+}
+
+fn resolve_keyvault_password(config: &KeyVaultConfig) -> Result<SecretString, ChainSdkError> {
+    if let Ok(value) = std::env::var(&config.password_env) {
+        if !value.is_empty() {
+            return Ok(SecretString::from(value));
+        }
+    }
+    if config.password_file.exists() {
+        return resolve_password(&PasswordSource::File(config.password_file.clone()))
+            .map_err(map_vault_err);
+    }
+    if config.allow_auto_generate_password {
+        if let Some(parent) = config.password_file.parent() {
+            std::fs::create_dir_all(parent).map_err(|error| {
+                ChainSdkError::ConfigError(format!(
+                    "create password dir {}: {error}",
+                    parent.display()
+                ))
+            })?;
+        }
+        return resolve_password(&PasswordSource::AutoGenerate {
+            target_file: config.password_file.clone(),
+        })
+        .map_err(map_vault_err);
+    }
+    Err(ChainSdkError::ConfigError(format!(
+        "keystore password unavailable: set {} or create {}",
+        config.password_env,
+        config.password_file.display()
+    )))
+}
+
+fn build_vault(config: &ChainSdkConfig) -> Result<Arc<dyn KeyVault>, ChainSdkError> {
+    match config.key_vault.scheme.as_str() {
+        "file-keystore" => {
+            let password = config.resolved_password.clone().ok_or_else(|| {
+                ChainSdkError::ConfigError(format!(
+                    "keystore password was not resolved; set {} or call resolve_config()",
+                    config.key_vault.password_env
+                ))
+            })?;
+            let vault = FileKeystore::new(config.key_vault.path.clone(), password)
+                .map_err(map_vault_err)?;
+            Ok(Arc::new(vault))
+        }
+        "memory-keystore" => Ok(Arc::new(MemoryKeystore::new())),
+        other => Err(ChainSdkError::ConfigError(format!(
+            "unsupported key_vault.scheme: {other}"
+        ))),
+    }
+}
+
+fn validate_for_build(config: &ChainSdkConfig) -> Result<(), ChainSdkError> {
+    if config.role.needs_keyvault() {
+        if config.participant.controller_did.trim().is_empty() {
+            return Err(ChainSdkError::ConfigError(
+                "role Issuer requires participant.controller_did".into(),
+            ));
+        }
+        crate::keys::validate_configured_keys(&config.key_vault.keys)?;
+    }
+    match config.mode {
+        ChainSdkMode::Centralized if config.centralized_endpoint.trim().is_empty() => Err(
+            ChainSdkError::ConfigError("mode centralized requires centralized_endpoint".into()),
+        ),
+        ChainSdkMode::Chain if config.chain_endpoint.trim().is_empty() => Err(
+            ChainSdkError::ConfigError("mode chain requires chain_endpoint".into()),
+        ),
+        _ => Ok(()),
+    }
+}
+
+/// 按配置构造 `Arc<dyn ChainSdk>`。
+///
+/// - Issuer：加载 `KeyVault`（`file-keystore` 必须有已解析密码）+ 两类密钥；
+/// - Verifier：不加载 `KeyVault`（S17）；
+/// - 两角色都装配 `did-sdk`（P4 完成，见 `docs/implementation-plan.md`）。
+///
+/// 初始化阶段返回占位实现：读方法返回 `Unsupported`，写方法先执行角色门禁
+/// 再返回 `Unsupported`；断言签名已可用。
 pub fn build_chain_sdk(config: &ChainSdkConfig) -> Result<Arc<dyn ChainSdk>, ChainSdkError> {
-    let _ = config;
-    Err(ChainSdkError::Unsupported(
-        "build_chain_sdk 尚未实现：初始化骨架，按实施文档 P0 落地".into(),
-    ))
+    let mut config = config.clone();
+    config.capabilities = config.capabilities.effective_for(config.role);
+    validate_for_build(&config)?;
+
+    let vault = match config.role {
+        SdkRole::Issuer => Some(build_vault(&config)?),
+        SdkRole::Verifier => None,
+    };
+    let keys = match (&vault, config.role) {
+        (Some(vault), SdkRole::Issuer) => Some(crate::keys::load_keys(
+            vault.as_ref(),
+            &config.key_vault.keys,
+        )?),
+        _ => None,
+    };
+
+    let role = config.role;
+    let core = SdkCore {
+        vault,
+        config,
+        role,
+        keys,
+    };
+    Ok(Arc::new(crate::placeholder::PlaceholderChainSdk::new(core)))
 }

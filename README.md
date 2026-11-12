@@ -3,12 +3,14 @@
 链能力契约（`Mock` / `Centralized` / `Chain` 三后端 × `Verifier` / `Issuer` 两角色），
 为服务端 Rust 应用提供**锚定读写、参与方查询、DID 解析、断言签名与事件订阅**。
 
-> **当前状态：初始化骨架（v0.1.0），等待实施评审。**
+> **当前状态：P0 完成（v0.1.0），按 [`docs/implementation-plan.md`](docs/implementation-plan.md) 推进。**
 >
-> 本提交只包含：依赖图、公开契约（trait / 类型 / 错误 / 配置）、配置样例、
-> 测试占位、CI 与构建脚本、实施步骤文档。业务实现与测试按
-> [`docs/implementation-plan.md`](docs/implementation-plan.md) 的 P0–P12 分阶段落地；
-> 评审批准前不进入实现。
+> - 已完成（P0）：公开契约、配置解析（TOML / env / override / 密码链）、
+>   两类密钥 namespace 校验（S14）、角色门禁（`ensure_issuer` / `ensure_self` /
+>   `ensure_signer`）、占位后端（读方法 `Unsupported`，断言签名可用）；
+> - 进行中（P1）：Mock 后端读、持久化与故障注入；
+> - 本地门禁：10 个配置测试 + 7 个 namespace/签名测试通过；
+> - GitHub 仓库尚未创建（用户选择先本地评审，见实施文档 D-18）。
 
 | 项目 | 内容 |
 |---|---|

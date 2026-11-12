@@ -19,7 +19,7 @@
 | 本地 A1 | `cargo check --locked --all-targets --all-features` | ✅ 通过（44.7s） |
 | 本地 A2 | `cargo fmt --all -- --check` | ✅ 通过 |
 | 本地 A2 | `cargo clippy --locked --all-targets --all-features -- -D warnings` | ✅ 零告警 |
-| 本地 A3 | `cargo test --locked --all-features` | ✅ 0 tests（骨架占位） |
+| 本地 A3 | `cargo test --locked --all-features` | ✅ 17 tests（P0） |
 | 依赖边界 | 无 `openssl` / `native-tls` | ✅ |
 | R1 边界 | `did-sdk` 依赖树无 `subxt` | ✅ 0 处 |
 | GitHub | 仓库创建 + 4 workflow 全绿 | ⏳ 待 D-18 |
@@ -31,28 +31,28 @@
 | 编号 | 验收项 | 通过标准 | 状态 | 证据 |
 |---|---|---|---|---|
 | S1 | 接口契约完整 | `ChainSdk` 16 方法齐备；`cargo check` | ⏳ 待实施 | `src/lib.rs`；CI 契约步骤 |
-| S2 | 三后端模式切换 | `mock`/`centralized`/`chain` 经 `mode` 切换，需重启 | ⏳ | `tests/config_resolution.rs` |
+| S2 | 三后端模式切换 | `mock`/`centralized`/`chain` 经 `mode` 切换，需重启 | 🟡 配置解析通过；后端待 P1/P5/P10 | `tests/config_resolution.rs`（10 用例） |
 | S3 | 三后端语义一致 | 同一操作结果与错误码一致 | ⏳ | `tests/consistency.rs` |
 | S4 | Mock 状态预置与持久化 | 预置可读；写后 JSON 更新；重启仍在 | ⏳ | `tests/mock_persistence.rs` |
 | S5 | Mock 故障注入 | 延迟 / 不可用 / 指定错误 | ⏳ | `tests/mock_fault_injection.rs` |
 | S6 | Centralized 接口映射 | method + path + 查询参数正确 | ⏳ | `tests/centralized_contract.rs` |
 | S7 | Centralized 写签名 | `x-chain-*` 三头；签名可验 | ⏳ | `tests/centralized_signing.rs` |
 | S8 | Centralized 缓存 | TTL 命中 + 过期穿透 + 关闭 | ⏳ | `tests/centralized_cache.rs` |
-| S9 | Chain 角色拦截 | Verifier 写 → `Unauthorized`；断言 → `SignerUnavailable` | ⏳ | `tests/role_gate.rs` |
-| S10 | 私钥管理内置 | FileKeystore 可用；密码链正确 | ⏳ | `tests/keyvault_integration.rs` |
+| S9 | Chain 角色拦截 | Verifier 写 → `Unauthorized`；断言 → `SignerUnavailable` | 🟡 断言签名拦截已通过；写拦截待 P2 | `tests/keys_namespace.rs::verifier_has_no_signer` |
+| S10 | 私钥管理内置 | FileKeystore 可用；密码链正确 | 🟡 FileKeystore 签名已通过；完整密码链待 P4 | `tests/keys_namespace.rs::issuer_signs_with_file_keystore` |
 | S11 | 事件订阅 | 三后端均能收到事件；取消幂等 | ⏳ | `tests/event_subscription.rs` |
 | S12 | 一致性测试 | Mock vs Centralized 同结果 | ⏳ | `tests/consistency.rs` |
 | S13 | `keyvault-core` 集成 | `UserRejected` / namespace 错误映射 | ⏳ | `tests/keyvault_integration.rs` |
-| **S14** | **namespace 隔离** | 错误前缀 → `KeyNamespaceViolation` | ⏳ | `tests/keys_namespace.rs` |
+| **S14** | **namespace 隔离** | 错误前缀 → `KeyNamespaceViolation` | ✅ P0 | `cargo test --test keys_namespace`（7 用例） |
 | **S15** | **参与方身份绑定** | DID ↔ id ↔ operator 双向索引 | ⏳ | `tests/participant_binding.rs` |
 | **S16** | **委托锚定语义** | `issuer_did` 信任根 / `submitter_id` / `delegated_by_did` | ⏳ | `tests/participant_binding.rs` |
-| **S17** | **按角色装配** | Verifier 无 vault / 有 did；Issuer 两者均有 | ⏳ | `tests/capabilities.rs` |
+| **S17** | **按角色装配** | Verifier 无 vault / 有 did；Issuer 两者均有 | 🟡 Verifier 无签名器已通过；did 装配待 P4 | `tests/keys_namespace.rs` |
 | **S18** | **无治理接口** | trait 无 5 个治理方法；CI grep | ⏳ | `tests/no_governance.rs`；`scripts/verify-roles.sh` |
 | **S19** | **自身管理写越权** | 改他人 → `Unauthorized` | ⏳ | `tests/role_gate.rs` |
 | **S20** | **business_types 不参与鉴权** | 篡改后行为不变 | ⏳ | `tests/participant_binding.rs` |
 | S1-static | musl 静态链接 | `file` 断言 static；`ldd` 无动态依赖 | ⏳ CI | `rust-musl.yml` |
 | S2-UserRejected | `UserRejected` 透传 | `KeyVaultError::UserRejected` → `ChainSdkError::UserRejected` | ⏳ | `tests/keyvault_integration.rs` |
-| S3-AppAlias | `role = "app"` 兼容 | 反序列化为 `Issuer` | ⏳ | `tests/config_resolution.rs` |
+| S3-AppAlias | `role = "app"` 兼容 | 反序列化为 `Issuer` | ✅ P0 | `tests/config_resolution.rs::role_app_alias_maps_to_issuer` |
 
 ---
 
@@ -129,7 +129,7 @@
 | 阶段 | 新增测试 | 累计 | 结果 |
 |---|---|---|---|
 | 初始化 | 0 | 0 | ✅ 0 passed |
-| P0 | — | — | ⏳ |
+| P0 | 17 | 17 | ✅ 17 passed（config_resolution 10 + keys_namespace 7） |
 | P1 | — | — | ⏳ |
 | P2 | — | — | ⏳ |
 | P3 | — | — | ⏳ |

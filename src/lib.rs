@@ -36,7 +36,13 @@
 pub mod config;
 pub mod error;
 pub mod events;
+pub mod keys;
 pub mod types;
+
+mod placeholder;
+mod role_gate;
+
+use std::sync::Arc;
 
 use async_trait::async_trait;
 
@@ -51,6 +57,22 @@ pub use types::{
     Ed25519PublicKey, Ed25519Signature, HealthStatus, ParticipantRecord, Sr25519Signature,
     VerificationMethod,
 };
+
+/// 三个后端共享的构造状态。
+///
+/// - `vault`：Verifier 为 `None`；Issuer 加载 `file-keystore` / `memory-keystore`；
+/// - `keys`：Issuer 才持有（已校验前缀）；
+/// - `config` / `role`：构造时快照，运行期不变。
+pub(crate) struct SdkCore {
+    /// 密钥库（仅 Issuer）。
+    pub(crate) vault: Option<Arc<dyn keyvault_core::KeyVault>>,
+    /// 构造配置。
+    pub(crate) config: ChainSdkConfig,
+    /// 配置角色。
+    pub(crate) role: SdkRole,
+    /// 两类密钥（仅 Issuer）。
+    pub(crate) keys: Option<crate::keys::LoadedKeys>,
+}
 
 /// 链能力的统一契约：三种后端（Mock / Centralized / Chain）× 两种角色
 /// （Verifier / Issuer）。
