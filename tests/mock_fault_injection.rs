@@ -4,16 +4,28 @@
 
 use std::time::{Duration, Instant};
 
-use chain_sdk::config::{ChainSdkConfig, ChainSdkMode, SdkRole};
+use chain_sdk::config::{ChainSdkConfig, ChainSdkMode, DidConfig, ParticipantConfig, SdkRole};
 use chain_sdk::{
     ChainSdk, ChainSdkError, FailureRule, MockState, build_mock_chain_sdk,
     build_mock_chain_sdk_with_state,
 };
 
+fn temp_vc_path() -> std::path::PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    std::env::temp_dir().join(format!("chain-sdk-vc-{}-{seq}", std::process::id()))
+}
+
 fn verifier_config() -> ChainSdkConfig {
     ChainSdkConfig {
         mode: ChainSdkMode::Mock,
         role: SdkRole::Verifier,
+        participant: ParticipantConfig {
+            controller_did: "did:web:verifier.example.com".into(),
+        },
+        did: DidConfig {
+            vc_storage_path: temp_vc_path(),
+        },
         ..Default::default()
     }
 }

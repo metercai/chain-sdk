@@ -34,6 +34,7 @@
 //! `docs/implementation-plan.md` 分阶段进行（P0–P12），评审通过后开始实现。
 
 pub mod config;
+mod did_adapter;
 pub mod error;
 pub mod events;
 pub mod keys;
@@ -69,6 +70,8 @@ pub use types::{
 pub(crate) struct SdkCore {
     /// 密钥库（仅 Issuer）。
     pub(crate) vault: Option<Arc<dyn keyvault_core::KeyVault>>,
+    /// DID 解析适配器（两角色都装配，S17）。
+    pub(crate) did: Option<Arc<dyn crate::did_adapter::DidPort>>,
     /// 构造配置。
     pub(crate) config: ChainSdkConfig,
     /// 配置角色。

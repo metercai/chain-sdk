@@ -9,7 +9,8 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use chain_sdk::config::{
-    ChainSdkConfig, ChainSdkMode, KeyVaultConfig, KeyVaultKeys, ParticipantConfig, SdkRole,
+    ChainSdkConfig, ChainSdkMode, DidConfig, KeyVaultConfig, KeyVaultKeys, ParticipantConfig,
+    SdkRole,
 };
 use chain_sdk::keys::{
     CHAIN_ACCOUNT_PREFIX, PARTICIPANT_DID_PREFIX, sign_extrinsic, sign_participant_assertion_inner,
@@ -20,12 +21,21 @@ use secrecy::SecretString;
 
 const SELF_DID: &str = "did:web:mail.example.com:issuer";
 
+fn temp_vc_path() -> std::path::PathBuf {
+    static SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    std::env::temp_dir().join(format!("chain-sdk-vc-{}-{seq}", std::process::id()))
+}
+
 fn issuer_config(scheme: &str, operator: String, participant_did: String) -> ChainSdkConfig {
     ChainSdkConfig {
         mode: ChainSdkMode::Mock,
         role: SdkRole::Issuer,
         participant: ParticipantConfig {
             controller_did: SELF_DID.into(),
+        },
+        did: DidConfig {
+            vc_storage_path: temp_vc_path(),
         },
         key_vault: KeyVaultConfig {
             scheme: scheme.into(),
@@ -93,6 +103,12 @@ async fn verifier_has_no_signer() {
     let config = ChainSdkConfig {
         role: SdkRole::Verifier,
         mode: ChainSdkMode::Mock,
+        participant: ParticipantConfig {
+            controller_did: "did:web:verifier.example.com".into(),
+        },
+        did: DidConfig {
+            vc_storage_path: temp_vc_path(),
+        },
         ..Default::default()
     };
     let sdk = build_chain_sdk(&config).unwrap();
@@ -129,6 +145,9 @@ async fn issuer_signs_with_file_keystore() {
         role: SdkRole::Issuer,
         participant: ParticipantConfig {
             controller_did: SELF_DID.into(),
+        },
+        did: DidConfig {
+            vc_storage_path: temp_vc_path(),
         },
         key_vault: KeyVaultConfig {
             scheme: "file-keystore".into(),

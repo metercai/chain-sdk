@@ -88,13 +88,21 @@ impl ChainSdk for PlaceholderChainSdk {
     }
 
     fn resolve_did_key(&self, did: &str) -> Result<Ed25519PublicKey, ChainSdkError> {
-        keyvault_core::crypto::decode_did_key_pubkey(did)
-            .map(Ed25519PublicKey)
-            .map_err(|error| ChainSdkError::InvalidArgument(format!("did:key: {error}")))
+        let port = self
+            .core
+            .did
+            .as_ref()
+            .ok_or_else(|| ChainSdkError::SignerUnavailable("did-sdk not assembled".into()))?;
+        port.resolve_did_key(did)
     }
 
-    async fn resolve_did_web(&self, _did: &str) -> Result<DidDocument, ChainSdkError> {
-        Err(pending("resolve_did_web"))
+    async fn resolve_did_web(&self, did: &str) -> Result<DidDocument, ChainSdkError> {
+        let port = self
+            .core
+            .did
+            .as_ref()
+            .ok_or_else(|| ChainSdkError::SignerUnavailable("did-sdk not assembled".into()))?;
+        port.resolve_did_web(did).await
     }
 
     async fn create_anchor(

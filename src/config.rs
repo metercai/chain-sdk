@@ -690,7 +690,7 @@ pub fn resolve_config(overrides: ConfigOverrides) -> Result<ChainSdkConfig, Chai
         config.resolved_password = None;
     }
 
-    validate_for_build(&config)?;
+    validate_for_resolve(&config)?;
     Ok(config)
 }
 
@@ -745,13 +745,8 @@ fn build_vault(config: &ChainSdkConfig) -> Result<Arc<dyn KeyVault>, ChainSdkErr
     }
 }
 
-fn validate_for_build(config: &ChainSdkConfig) -> Result<(), ChainSdkError> {
+fn validate_for_resolve(config: &ChainSdkConfig) -> Result<(), ChainSdkError> {
     if config.role.needs_keyvault() {
-        if config.participant.controller_did.trim().is_empty() {
-            return Err(ChainSdkError::ConfigError(
-                "role Issuer requires participant.controller_did".into(),
-            ));
-        }
         crate::keys::validate_configured_keys(&config.key_vault.keys)?;
     }
     match config.mode {
@@ -763,6 +758,16 @@ fn validate_for_build(config: &ChainSdkConfig) -> Result<(), ChainSdkError> {
         ),
         _ => Ok(()),
     }
+}
+
+fn validate_for_build(config: &ChainSdkConfig) -> Result<(), ChainSdkError> {
+    validate_for_resolve(config)?;
+    if config.participant.controller_did.trim().is_empty() {
+        return Err(ChainSdkError::ConfigError(
+            "participant.controller_did is required (did-sdk needs a participant DID)".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// 装配三个后端共享的 [`SdkCore`]。
@@ -787,9 +792,13 @@ fn assemble_core(config: &ChainSdkConfig) -> Result<SdkCore, ChainSdkError> {
         _ => None,
     };
 
+    let did = Some(Arc::new(crate::did_adapter::DidSdkAdapter::build(&config)?)
+        as Arc<dyn crate::did_adapter::DidPort>);
+
     let role = config.role;
     Ok(SdkCore {
         vault,
+        did,
         config,
         role,
         keys,
@@ -827,4 +836,63 @@ pub fn build_mock_chain_sdk_with_state(
 ) -> Result<Arc<crate::mock::MockChainSdk>, ChainSdkError> {
     let core = assemble_core(config)?;
     Ok(Arc::new(crate::mock::MockChainSdk::with_state(core, state)))
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use super::*;
+
+    fn temp_vc_path() -> PathBuf {
+        static SEQ: AtomicU64 = AtomicU64::new(0);
+        let seq = SEQ.fetch_add(1, Ordering::SeqCst);
+        std::env::temp_dir().join(format!("chain-sdk-core-{}-{seq}", std::process::id()))
+    }
+
+    fn base_config(role: SdkRole) -> ChainSdkConfig {
+        ChainSdkConfig {
+            mode: ChainSdkMode::Mock,
+            role,
+            participant: ParticipantConfig {
+                controller_did: "did:web:participant.example.com".into(),
+            },
+            did: DidConfig {
+                vc_storage_path: temp_vc_path(),
+            },
+            key_vault: KeyVaultConfig {
+                scheme: "memory-keystore".into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn verifier_core_has_did_but_no_vault_or_keys() {
+        let core = assemble_core(&base_config(SdkRole::Verifier)).unwrap();
+        assert!(core.did.is_some(), "Verifier must assemble did-sdk (S17)");
+        assert!(core.vault.is_none(), "Verifier must not load KeyVault");
+        assert!(core.keys.is_none());
+        assert!(!core.config.capabilities.issuer_signing);
+    }
+
+    #[test]
+    fn issuer_core_has_vault_did_and_keys() {
+        let core = assemble_core(&base_config(SdkRole::Issuer)).unwrap();
+        assert!(core.did.is_some());
+        assert!(core.vault.is_some());
+        assert!(core.keys.is_some());
+        assert!(core.config.capabilities.did_resolution);
+    }
+
+    #[test]
+    fn build_requires_participant_did() {
+        let mut config = base_config(SdkRole::Verifier);
+        config.participant.controller_did.clear();
+        let error = assemble_core(&config).err().expect("expected error");
+        assert!(matches!(error, ChainSdkError::ConfigError(_)));
+    }
 }

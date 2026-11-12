@@ -9,6 +9,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use chain_sdk::ChainSdkError;
+use chain_sdk::build_chain_sdk;
 use chain_sdk::config::{ChainSdkConfig, ChainSdkMode, ConfigOverrides, SdkRole, resolve_config};
 
 /// 需要在每个用例中清理的环境变量（避免宿主机环境影响断言）。
@@ -241,7 +242,10 @@ fn issuer_requires_controller_did() {
             ("CHAIN_SDK_KEYVAULT_SCHEME", Some("memory-keystore")),
         ],
         || {
-            let error = resolve_config(ConfigOverrides::default()).unwrap_err();
+            // resolve_config 允许空 controller_did（便于只做配置检查）；
+            // build_chain_sdk 在装配 did-sdk 前要求它非空。
+            let config = resolve_config(ConfigOverrides::default()).unwrap();
+            let error = build_chain_sdk(&config).err().expect("expected error");
             match error {
                 ChainSdkError::ConfigError(message) => {
                     assert!(message.contains("controller_did"), "{message}");

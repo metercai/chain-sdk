@@ -341,7 +341,8 @@ SdkCore {
 ### D-05　`did-sdk<Server>` 的构造与副作用
 
 - **建议**：两角色都构造 `DidSdk<Server>`（S17 要求 Verifier 也有 `did-resolution`）：
-  - `participant_did = config.participant.controller_did`；
+  - `participant_did = config.participant.controller_did`（**两角色都要求非空**；
+    `resolve_config` 允许为空以便只做配置检查，`build_chain_sdk` 拒绝空值）；
   - `key_vault = None`（签名私钥只在 chain-sdk）；
   - `mode`：`Mock` → did-sdk `Mock`；`Centralized`/`Chain` → did-sdk `Centralized`；
   - `vc_storage_path = config.did.vc_storage_path`。

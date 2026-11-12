@@ -333,15 +333,22 @@ impl ChainSdk for MockChainSdk {
     }
 
     fn resolve_did_key(&self, did: &str) -> Result<Ed25519PublicKey, ChainSdkError> {
-        keyvault_core::crypto::decode_did_key_pubkey(did)
-            .map(Ed25519PublicKey)
-            .map_err(|error| ChainSdkError::InvalidArgument(format!("did:key: {error}")))
+        let port = self
+            .core
+            .did
+            .as_ref()
+            .ok_or_else(|| ChainSdkError::SignerUnavailable("did-sdk not assembled".into()))?;
+        port.resolve_did_key(did)
     }
 
-    async fn resolve_did_web(&self, _did: &str) -> Result<DidDocument, ChainSdkError> {
-        Err(ChainSdkError::Unsupported(
-            "resolve_did_web 尚未实现：P4 装配 did-sdk".into(),
-        ))
+    async fn resolve_did_web(&self, did: &str) -> Result<DidDocument, ChainSdkError> {
+        self.check_failure("resolve_did_web").await?;
+        let port = self
+            .core
+            .did
+            .as_ref()
+            .ok_or_else(|| ChainSdkError::SignerUnavailable("did-sdk not assembled".into()))?;
+        port.resolve_did_web(did).await
     }
 
     async fn create_anchor(
