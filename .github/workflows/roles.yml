@@ -49,8 +49,8 @@ jobs:
 
       - name: Assert did-sdk has no subxt dependency (R1)
         run: |
-          if cargo tree --locked -p chain-sdk -e normal | grep -A1 'did-sdk v' | grep -q 'subxt'; then
+          if cargo tree --locked -p did-sdk -e normal | grep -q 'subxt'; then
             echo "[FAIL] did-sdk must not depend on subxt (R1)"
             exit 1
           fi
-          echo "[OK] did-sdk has no direct subxt dependency"
+          echo "[OK] did-sdk dependency tree has no subxt"

@@ -21,8 +21,8 @@
 >   storage/extrinsic 按 D-06 返回 `Unsupported`）、`mini_cli`、Mock vs Centralized 一致性；
 > - 已完成（P12）：SD-JWT 选择性披露原语（`sd-v1` 盐化哈希、Disclosures、
 >   `SD-VP-v1` 验证、锚定生命周期检查）；端到端交付仍依赖 did-sdk v0.2（D-16）；
-> - 待办（P13）：文档收尾 + GitHub 推送（用户要求先本地评审，D-18）；
-> - 本地门禁：93 个测试通过；
+> - 待办（P13）：GitHub 推送与 CI 结果（用户要求先本地评审，D-18）；
+> - 本地门禁：93 个测试通过；详见 [`docs/implementation-report.md`](docs/implementation-report.md)；
 > - GitHub 仓库尚未创建（用户选择先本地评审，见实施文档 D-18）。
 
 | 项目 | 内容 |
@@ -293,6 +293,7 @@ chain-sdk/
 |---|---|
 | [`docs/implementation-plan.md`](docs/implementation-plan.md) | **实施步骤与评审决策（评审入口）** |
 | [`docs/acceptance-checklist.md`](docs/acceptance-checklist.md) | S1–S20 与 SD-JWT 验收项 |
+| [`docs/implementation-report.md`](docs/implementation-report.md) | P0–P12 实施记录、证据与偏差 |
 | [`docs/specs/01-...`](docs/specs/) | ChainSdk 接口契约与实现规格书 v2 |
 | [`docs/specs/02-...`](docs/specs/) | did-sdk 移除链上查询与 subxt 依赖的修订（R1） |
 | [`docs/specs/03-...`](docs/specs/) | VC 选择性披露特性补充附件 |
