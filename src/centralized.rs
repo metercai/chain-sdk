@@ -268,6 +268,10 @@ impl RoleGate for CentralizedChainSdk {
 
 #[async_trait]
 impl ChainSdk for CentralizedChainSdk {
+    fn participant_did(&self) -> &str {
+        &self.core.config.participant.controller_did
+    }
+
     async fn health_check(&self) -> Result<HealthStatus, ChainSdkError> {
         let url = self.url(&["health"])?;
         match self

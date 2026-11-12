@@ -35,7 +35,7 @@ jobs:
       - name: Contract completeness (S1)
         run: |
           for method in \
-            health_check get_anchor list_anchors \
+            participant_did health_check get_anchor list_anchors \
             get_participant get_participant_by_did list_participants \
             resolve_did resolve_did_key resolve_did_web \
             create_anchor revoke_anchor renew_anchor \

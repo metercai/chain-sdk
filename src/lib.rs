@@ -41,6 +41,7 @@ pub mod error;
 pub mod events;
 pub mod keys;
 pub mod mock;
+pub mod sd;
 pub mod types;
 
 mod role_gate;
@@ -59,6 +60,10 @@ pub use config::{
 pub use error::ChainSdkError;
 pub use events::{EventData, Unsubscribe};
 pub use mock::{FailureRule, MockChainSdk, MockState};
+pub use sd::{
+    SdDisclosure, SdExpected, SdIssueRequest, SdIssuedCredential, SdPresentation, SdProof,
+    SdVerificationReport, SelectiveDisclosure,
+};
 pub use types::{
     AnchorRecord, AnchorType, AssertionPurpose, BusinessType, ChainRole, DidDocument, DidRecord,
     Ed25519PublicKey, Ed25519Signature, HealthStatus, ParticipantRecord, Sr25519Signature,
@@ -124,7 +129,12 @@ impl SdkCore {
 /// 本 trait 通过 `Arc<dyn ChainSdk>` 使用；`subscribe_event` 是同步方法，
 /// 回调表由实现内部以 `std::sync::RwLock` 维护。
 #[async_trait]
-pub trait ChainSdk: Send + Sync {
+pub trait ChainSdk: SelectiveDisclosure + Send + Sync {
+    // ===== 身份 =====
+
+    /// 本参与方的 `did:web`（SD-JWT 签发时的 `issuer` 字段）。
+    fn participant_did(&self) -> &str;
+
     // ===== 连接管理 =====
 
     /// 健康检查。返回当前后端模式、是否可用以及（可选）区块高度。

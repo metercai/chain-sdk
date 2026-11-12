@@ -272,6 +272,10 @@ impl RoleGate for MockChainSdk {
 
 #[async_trait]
 impl ChainSdk for MockChainSdk {
+    fn participant_did(&self) -> &str {
+        &self.core.config.participant.controller_did
+    }
+
     async fn health_check(&self) -> Result<HealthStatus, ChainSdkError> {
         let unavailable = self.unavailable.load(Ordering::SeqCst);
         let current_time = self.state.read().await.current_time;

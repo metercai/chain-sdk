@@ -8,6 +8,7 @@
 const LIB_SOURCE: &str = include_str!("../src/lib.rs");
 
 const EXPECTED_METHODS: &[&str] = &[
+    "participant_did",
     "health_check",
     "get_anchor",
     "list_anchors",

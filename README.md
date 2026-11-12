@@ -19,8 +19,10 @@
 > - 已完成（P9）：三后端事件订阅（Mock 内存、Centralized WebSocket、Chain subxt）；
 > - 已完成（P10–P11）：Chain 后端（连接/健康检查/finalized 事件 + 角色拦截；
 >   storage/extrinsic 按 D-06 返回 `Unsupported`）、`mini_cli`、Mock vs Centralized 一致性；
-> - 进行中（P12）：SD-JWT 选择性披露原语（按 D-13～D-16 决策）；
-> - 本地门禁：84 个测试通过；
+> - 已完成（P12）：SD-JWT 选择性披露原语（`sd-v1` 盐化哈希、Disclosures、
+>   `SD-VP-v1` 验证、锚定生命周期检查）；端到端交付仍依赖 did-sdk v0.2（D-16）；
+> - 待办（P13）：文档收尾 + GitHub 推送（用户要求先本地评审，D-18）；
+> - 本地门禁：93 个测试通过；
 > - GitHub 仓库尚未创建（用户选择先本地评审，见实施文档 D-18）。
 
 | 项目 | 内容 |

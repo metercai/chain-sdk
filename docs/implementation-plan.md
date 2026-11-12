@@ -439,7 +439,10 @@ SdkCore {
 - **方案 B**：独立 trait + 独立工厂 `build_sd_service(&ChainSdkConfig)`；
   `ChainSdk` 不变。缺点：需要额外装配入口，且验证需要复用 `get_anchor`。
 - **方案 C**：独立 crate `chain-sdk-sd`。缺点：本期不发布 crates.io，过度拆分。
-- **建议**：A，但**仅在 D-14/D-15/D-16 批准后**进入 P11；否则先交付 P0–P10。
+- **建议**：A，但**仅在 D-14/D-15/D-16 批准后**进入 P12；否则先交付 P0–P10。
+- **实施记录（2026-11-13）**：已按方案 A 实现 `SelectiveDisclosure` supertrait；
+  为签发 VC 的 `issuer` 字段，`ChainSdk` 增加 `participant_did()` 访问器
+  （方法总数 16 → 17）。`sd-jwt` feature 保留为未来门控，当前实现始终编译。
 
 ### D-14　SD-JWT 哈希公式：按附件实现 `sd-v1`
 
@@ -462,6 +465,10 @@ SdkCore {
     与 did-sdk 的 `vc_hash_without_proof` 一致；
   - SD-JWT 的 `_sd` 哈希用 **SHA-256**（与 `_sd_alg` 一致），两者互不影响。
 - **理由**：链上锚定与网关校验必须一致；单方面改成 SHA-256 会让既有锚定失配。
+- **实施补充（2026-11-13）**：`credentialStatus.anchorId` 在锚定成功后写入，因此
+  **不参与** `payload_hash`（否则“先有锚定 id 才能算哈希”形成循环）；它由 VC 的
+  issuer 签名覆盖。验证方重算 `payload_hash` 时同样剔除 `proof` 与
+  `credentialStatus`。
 - **待确认**：Q-03（是否需要 RFC 8785 JCS）。
 
 ### D-16　did-sdk 模型缺口与跨仓库依赖（评审重点）

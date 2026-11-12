@@ -41,6 +41,11 @@ tracing = "0.1"
 secrecy = "0.10"
 hex = "0.4"
 dirs = "6"
+# SD-JWT（sha-256 盐化哈希；base64url；base58 proof 编码）
+sha2 = "0.10"
+base64 = "0.22"
+bs58 = "0.5"
+getrandom = "0.4"
 
 tokio = { version = "1.44", features = ["rt-multi-thread", "macros", "sync", "fs", "time"] }
 # musl 静态：必须 rustls（纯 Rust TLS），禁止 native-tls / openssl。
@@ -76,6 +81,10 @@ reqwest = { workspace = true }
 tokio-tungstenite = { workspace = true }
 subxt = { workspace = true }
 dirs = { workspace = true }
+sha2 = { workspace = true }
+base64 = { workspace = true }
+bs58 = { workspace = true }
+getrandom = { workspace = true }
 
 [dev-dependencies]
 wiremock = { workspace = true }

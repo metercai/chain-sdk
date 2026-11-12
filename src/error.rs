@@ -23,6 +23,12 @@ pub enum ChainSdkError {
     /// 锚定已撤销，不能重复撤销。
     #[error("Anchor already revoked: {0}")]
     AnchorRevoked(String),
+    /// 锚定已过期（`valid_until != 0` 且当前时间超过）。
+    #[error("Anchor expired: {0}")]
+    AnchorExpired(String),
+    /// 锚定载荷哈希与重算值不一致（VC 被篡改或锚定错配）。
+    #[error("Anchor payload hash mismatch: {0}")]
+    AnchorPayloadMismatch(String),
     /// 参与方不存在。
     #[error("Participant not found: {0}")]
     ParticipantNotFound(u32),
@@ -56,6 +62,18 @@ pub enum ChainSdkError {
     /// 用户拒绝签名。来源：`KeyVaultError::UserRejected` 1:1 透传。
     #[error("User rejected signing")]
     UserRejected,
+    /// Disclosure 重算哈希不在 `_sd` 数组中。
+    #[error("Disclosure hash mismatch")]
+    DisclosureHashMismatch,
+    /// 同一属性被多次披露。
+    #[error("Duplicate disclosure: {0}")]
+    DisclosureDuplicate(String),
+    /// VC 缺少 `_sd` / `_sd_alg`，或 VP 缺少必要的 disclosures。
+    #[error("Missing selective disclosure data: {0}")]
+    DisclosureMissing(String),
+    /// `_sd_alg` 不是受支持的算法。
+    #[error("Unsupported SD algorithm: {0}")]
+    SdAlgUnsupported(String),
     /// 配置错误。
     #[error("Configuration error: {0}")]
     ConfigError(String),

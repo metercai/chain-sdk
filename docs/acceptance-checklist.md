@@ -19,7 +19,7 @@
 | 本地 A1 | `cargo check --locked --all-targets --all-features` | ✅ 通过（44.7s） |
 | 本地 A2 | `cargo fmt --all -- --check` | ✅ 通过 |
 | 本地 A2 | `cargo clippy --locked --all-targets --all-features -- -D warnings` | ✅ 零告警 |
-| 本地 A3 | `cargo test --locked --all-features` | ✅ 84 tests（P0–P11） |
+| 本地 A3 | `cargo test --locked --all-features` | ✅ 93 tests（P0–P12） |
 | 依赖边界 | 无 `openssl` / `native-tls` | ✅ |
 | R1 边界 | `did-sdk` 依赖树无 `subxt` | ✅ 0 处 |
 | GitHub | 仓库创建 + 4 workflow 全绿 | ⏳ 待 D-18 |
@@ -74,11 +74,11 @@
 
 | 编号 | 验收项 | 通过标准 | 状态 |
 |---|---|---|---|
-| I1 | 盐化哈希生成 | 每属性 16B 随机盐；`sd-v1` 公式 | ⏳ |
-| I2 | `_sd` 数组构造 | VC 含正确 `_sd` / `_sd_alg` | ⏳ |
-| I3 | 独立随机盐 | 同 VC 不同属性、不同 VC 同属性哈希均不同 | ⏳ |
-| I4 | Disclosures 生成 | `[salt, name, value]` 格式 | ⏳ |
-| I5 | 链上锚定不变 | `payload_hash` 覆盖 VC（含 `_sd`，不含 Disclosures） | ⏳ |
+| I1 | 盐化哈希生成 | 每属性 16B 随机盐；`sd-v1` 公式 | ✅ P12 |
+| I2 | `_sd` 数组构造 | VC 含正确 `_sd` / `_sd_alg` | ✅ P12 |
+| I3 | 独立随机盐 | 同 VC 不同属性、不同 VC 同属性哈希均不同 | ✅ P12 |
+| I4 | Disclosures 生成 | `[salt, name, value]` 格式 | ✅ P12 |
+| I5 | 链上锚定不变 | `payload_hash` 覆盖 VC（含 `_sd`，不含 Disclosures） | ✅ P12 |
 | I6 | Disclosures 交付 | 与 VC 一并安全交付（依赖 did-sdk v0.2） | ⏳ 外部依赖 |
 
 ### 3.2 出示侧（did-sdk，跨仓库）
@@ -95,21 +95,21 @@
 
 | 编号 | 验收项 | 通过标准 | 状态 |
 |---|---|---|---|
-| V1 | VP 签名验证 | holder 签名有效；challenge 匹配 | ⏳ |
-| V2 | VC 签名验证 | issuer 签名有效 | ⏳ |
-| V3 | Disclosure 哈希比对 | 每条重算命中 `_sd` | ⏳ |
-| V4 | 未披露属性不可见 | 仅见 `_sd` 哈希 | ⏳ |
-| V5 | 链上锚定查询 | `revoked` / `valid_until` 检查 | ⏳ |
-| V6 | 篡改检测 | 改盐/值 → `DisclosureHashMismatch` | ⏳ |
-| V7 | 重复披露检测 | 同名重复 → `DisclosureDuplicate` | ⏳ |
+| V1 | VP 签名验证 | holder 签名有效；challenge 匹配 | ✅ P12 |
+| V2 | VC 签名验证 | issuer 签名有效 | ✅ P12 |
+| V3 | Disclosure 哈希比对 | 每条重算命中 `_sd` | ✅ P12 |
+| V4 | 未披露属性不可见 | 仅见 `_sd` 哈希 | ✅ P12 |
+| V5 | 链上锚定查询 | `revoked` / `valid_until` 检查 | ✅ P12 |
+| V6 | 篡改检测 | 改盐/值 → `DisclosureHashMismatch` | ✅ P12 |
+| V7 | 重复披露检测 | 同名重复 → `DisclosureDuplicate` | ✅ P12 |
 
 ### 3.4 隐私边界
 
 | 编号 | 验收项 | 通过标准 | 状态 |
 |---|---|---|---|
-| P-SD1 | 跨 VC 不可关联 | 同主体不同 VC 同属性哈希不同 | ⏳ |
+| P-SD1 | 跨 VC 不可关联 | 同主体不同 VC 同属性哈希不同 | ✅ P12 |
 | P-SD2 | 同 VC 跨出示可关联 | 文档明确标注边界 | ✅ README/SD 附件 |
-| P-SD3 | 字典攻击防护 | 哈希不可反推 | ⏳ |
+| P-SD3 | 字典攻击防护 | 随机盐使哈希不可反推 | ✅ P12 |
 
 ---
 
@@ -141,7 +141,7 @@
 | P9 | 5 | 77 | ✅ event_subscription 3 + events 单元 2 |
 | P10 | 5 | 82 | ✅ role_matrix 4 + chain 订阅 1 |
 | P11 | 2 | 84 | ✅ consistency 2 |
-| P12（可选） | — | — | ⏳ |
+| P12 | 9 | 93 | ✅ sd_issue 2 + sd_verify 7 |
 
 ---
 

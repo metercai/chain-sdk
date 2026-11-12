@@ -124,6 +124,10 @@ async fn run_event_stream(endpoint: String, table: Arc<SubscriptionTable>) {
 
 #[async_trait]
 impl ChainSdk for ChainModeSdk {
+    fn participant_did(&self) -> &str {
+        &self.core.config.participant.controller_did
+    }
+
     async fn health_check(&self) -> Result<HealthStatus, ChainSdkError> {
         match self.client().await {
             Ok(client) => match client.at_current_block().await {
