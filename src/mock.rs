@@ -8,6 +8,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -15,6 +16,7 @@ use async_lock::RwLock;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
+use crate::events::SubscriptionTable;
 use crate::role_gate::RoleGate;
 use crate::{
     AnchorRecord, AnchorType, AssertionPurpose, ChainSdk, ChainSdkError, DidDocument, DidRecord,
@@ -101,6 +103,7 @@ pub struct MockChainSdk {
     failures: RwLock<Vec<FailureRule>>,
     unavailable: AtomicBool,
     persistence_path: Option<PathBuf>,
+    subscribers: Arc<SubscriptionTable>,
 }
 
 impl MockChainSdk {
@@ -128,6 +131,7 @@ impl MockChainSdk {
             state: RwLock::new(state),
             failures: RwLock::new(Vec::new()),
             unavailable: AtomicBool::new(false),
+            subscribers: Arc::new(SubscriptionTable::new()),
         }
     }
 
@@ -169,6 +173,24 @@ impl MockChainSdk {
                 path.display()
             ))
         })
+    }
+
+    async fn emit_event(
+        &self,
+        event_name: &str,
+        anchor_id: Option<String>,
+        participant_id: Option<u32>,
+        payload: serde_json::Value,
+    ) {
+        let block_number = self.state.read().await.current_time;
+        let event = EventData {
+            event_name: event_name.to_string(),
+            anchor_id,
+            participant_id,
+            block_number: Some(block_number),
+            payload,
+        };
+        self.subscribers.emit(&event);
     }
 
     async fn check_failure(&self, op: &str) -> Result<(), ChainSdkError> {
@@ -369,7 +391,7 @@ impl ChainSdk for MockChainSdk {
             let anchor_id = format!("anchor:{}", state.next_anchor_seq);
             let record = AnchorRecord {
                 anchor_id: anchor_id.clone(),
-                anchor_type,
+                anchor_type: anchor_type.clone(),
                 submitter_id: self.self_participant_id(),
                 issuer_did: self.core.config.participant.controller_did.clone(),
                 delegated_by_did: None,
@@ -383,6 +405,17 @@ impl ChainSdk for MockChainSdk {
         };
 
         self.persist().await?;
+        self.emit_event(
+            "AnchorCreated",
+            Some(anchor_id.clone()),
+            Some(self.self_participant_id()),
+            serde_json::json!({
+                "anchor_type": anchor_type,
+                "payload_hash": payload_hash,
+                "valid_until": valid_until,
+            }),
+        )
+        .await;
         Ok(anchor_id)
     }
 
@@ -402,7 +435,15 @@ impl ChainSdk for MockChainSdk {
             anchor.revoked = true;
         }
 
-        self.persist().await
+        self.persist().await?;
+        self.emit_event(
+            "AnchorRevoked",
+            Some(anchor_id.to_string()),
+            Some(self.self_participant_id()),
+            serde_json::json!({}),
+        )
+        .await;
+        Ok(())
     }
 
     async fn renew_anchor(
@@ -433,7 +474,15 @@ impl ChainSdk for MockChainSdk {
             anchor.valid_until = new_valid_until;
         }
 
-        self.persist().await
+        self.persist().await?;
+        self.emit_event(
+            "AnchorRenewed",
+            Some(anchor_id.to_string()),
+            Some(self.self_participant_id()),
+            serde_json::json!({ "valid_until": new_valid_until }),
+        )
+        .await;
+        Ok(())
     }
 
     async fn update_authorized_domains(
@@ -453,10 +502,18 @@ impl ChainSdk for MockChainSdk {
             if !participant.active {
                 return Err(ChainSdkError::ParticipantInactive(participant_id));
             }
-            participant.authorized_domains = domains;
+            participant.authorized_domains = domains.clone();
         }
 
-        self.persist().await
+        self.persist().await?;
+        self.emit_event(
+            "ParticipantUpdated",
+            None,
+            Some(participant_id),
+            serde_json::json!({ "field": "authorized_domains", "domains": domains }),
+        )
+        .await;
+        Ok(())
     }
 
     async fn update_controller_did(
@@ -500,7 +557,15 @@ impl ChainSdk for MockChainSdk {
             }
         }
 
-        self.persist().await
+        self.persist().await?;
+        self.emit_event(
+            "ParticipantUpdated",
+            None,
+            Some(participant_id),
+            serde_json::json!({ "field": "controller_did", "controller_did": new_controller_did }),
+        )
+        .await;
+        Ok(())
     }
 
     async fn sign_participant_assertion(
@@ -514,11 +579,9 @@ impl ChainSdk for MockChainSdk {
 
     fn subscribe_event(
         &self,
-        _event_name: &str,
-        _callback: Box<dyn Fn(EventData) + Send + Sync>,
+        event_name: &str,
+        callback: Box<dyn Fn(EventData) + Send + Sync>,
     ) -> Result<Unsubscribe, ChainSdkError> {
-        Err(ChainSdkError::Unsupported(
-            "subscribe_event 尚未实现：P9".into(),
-        ))
+        Ok(self.subscribers.register(event_name, callback))
     }
 }

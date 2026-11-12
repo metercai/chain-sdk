@@ -19,7 +19,7 @@
 | 本地 A1 | `cargo check --locked --all-targets --all-features` | ✅ 通过（44.7s） |
 | 本地 A2 | `cargo fmt --all -- --check` | ✅ 通过 |
 | 本地 A2 | `cargo clippy --locked --all-targets --all-features -- -D warnings` | ✅ 零告警 |
-| 本地 A3 | `cargo test --locked --all-features` | ✅ 72 tests（P0–P8） |
+| 本地 A3 | `cargo test --locked --all-features` | ✅ 77 tests（P0–P9） |
 | 依赖边界 | 无 `openssl` / `native-tls` | ✅ |
 | R1 边界 | `did-sdk` 依赖树无 `subxt` | ✅ 0 处 |
 | GitHub | 仓库创建 + 4 workflow 全绿 | ⏳ 待 D-18 |
@@ -40,7 +40,7 @@
 | S8 | Centralized 缓存 | TTL 命中 + 过期穿透 + 关闭 | ✅ P5 | `tests/centralized_cache.rs`（3） |
 | S9 | Chain 角色拦截 | Verifier 写 → `Unauthorized`；断言 → `SignerUnavailable` | ✅ P2（Mock） | `tests/role_gate.rs::verifier_cannot_write_any_backend` |
 | S10 | 私钥管理内置 | FileKeystore 可用；密码链正确 | 🟡 FileKeystore 签名已通过；完整密码链待 P4 | `tests/keys_namespace.rs::issuer_signs_with_file_keystore` |
-| S11 | 事件订阅 | 三后端均能收到事件；取消幂等 | ⏳ | `tests/event_subscription.rs` |
+| S11 | 事件订阅 | 三后端均能收到事件；取消幂等 | 🟡 Mock + Centralized 通过；Chain 待 P10 | `tests/event_subscription.rs`（3）+ events 单元（2） |
 | S12 | 一致性测试 | Mock vs Centralized 同结果 | ⏳ | `tests/consistency.rs` |
 | S13 | `keyvault-core` 集成 | `UserRejected` / namespace 错误映射 | ⏳ | `tests/keyvault_integration.rs` |
 | **S14** | **namespace 隔离** | 错误前缀 → `KeyNamespaceViolation` | ✅ P0 | `cargo test --test keys_namespace`（7 用例） |
@@ -138,7 +138,7 @@
 | P6 | 6 | 64 | ✅ centralized_signing 5 + canonical 单元 1 |
 | P7 | 5 | 69 | ✅ participant_binding 5 |
 | P8 | 3 | 72 | ✅ no_governance 3 |
-| P9 | — | — | ⏳ |
+| P9 | 5 | 77 | ✅ event_subscription 3 + events 单元 2 |
 | P10 | — | — | ⏳ |
 | P11 | — | — | ⏳ |
 | P12（可选） | — | — | ⏳ |

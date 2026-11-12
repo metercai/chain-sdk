@@ -4,15 +4,19 @@
 //! 缓存；`cache_ttl_secs = 0` 关闭缓存。
 
 use std::collections::HashMap;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use async_lock::RwLock;
 use async_trait::async_trait;
+use futures::{SinkExt, StreamExt};
 use reqwest::{Client, StatusCode, Url};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::events::SubscriptionTable;
 use crate::role_gate::RoleGate;
 use crate::{
     AnchorRecord, AnchorType, AssertionPurpose, ChainSdk, ChainSdkError, DidDocument, DidRecord,
@@ -42,6 +46,8 @@ pub struct CentralizedChainSdk {
     endpoint: String,
     ttl_secs: u64,
     anchors: RwLock<HashMap<String, CacheEntry>>,
+    subscribers: Arc<SubscriptionTable>,
+    ws_started: AtomicBool,
 }
 
 impl CentralizedChainSdk {
@@ -57,6 +63,8 @@ impl CentralizedChainSdk {
             core,
             http,
             anchors: RwLock::new(HashMap::new()),
+            subscribers: Arc::new(SubscriptionTable::new()),
+            ws_started: AtomicBool::new(false),
         })
     }
 
@@ -480,13 +488,82 @@ impl ChainSdk for CentralizedChainSdk {
 
     fn subscribe_event(
         &self,
-        _event_name: &str,
-        _callback: Box<dyn Fn(EventData) + Send + Sync>,
+        event_name: &str,
+        callback: Box<dyn Fn(EventData) + Send + Sync>,
     ) -> Result<Unsubscribe, ChainSdkError> {
-        Err(ChainSdkError::Unsupported(
-            "centralized subscribe_event 尚未实现：P9".into(),
-        ))
+        let handle = self.subscribers.register(event_name, callback);
+        if !self.ws_started.swap(true, Ordering::SeqCst) {
+            start_event_stream(
+                self.core.config.centralized_endpoint.clone(),
+                Arc::clone(&self.subscribers),
+            );
+        }
+        Ok(handle)
     }
+}
+
+fn websocket_url(endpoint: &str) -> String {
+    let trimmed = endpoint.trim_end_matches('/');
+    if let Some(rest) = trimmed.strip_prefix("https://") {
+        format!("wss://{rest}/events")
+    } else if let Some(rest) = trimmed.strip_prefix("http://") {
+        format!("ws://{rest}/events")
+    } else if trimmed.starts_with("ws://") || trimmed.starts_with("wss://") {
+        format!("{trimmed}/events")
+    } else {
+        format!("ws://{trimmed}/events")
+    }
+}
+
+/// 单连接 + 重连的事件流（POC）。
+///
+/// `Unsubscribe` 只移除回调；连接保持到进程结束（或服务端关闭）。
+async fn run_event_stream(endpoint: String, table: Arc<SubscriptionTable>) {
+    loop {
+        let url = websocket_url(&endpoint);
+        match tokio_tungstenite::connect_async(&url).await {
+            Ok((mut socket, _)) => {
+                while let Some(message) = socket.next().await {
+                    match message {
+                        Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
+                            match serde_json::from_str::<EventData>(&text) {
+                                Ok(event) => table.emit(&event),
+                                Err(error) => {
+                                    tracing::warn!(%error, "ignore malformed event frame");
+                                }
+                            }
+                        }
+                        Ok(tokio_tungstenite::tungstenite::Message::Ping(payload)) => {
+                            let _ = socket
+                                .send(tokio_tungstenite::tungstenite::Message::Pong(payload))
+                                .await;
+                        }
+                        Ok(tokio_tungstenite::tungstenite::Message::Close(_)) | Err(_) => break,
+                        _ => {}
+                    }
+                }
+            }
+            Err(error) => {
+                tracing::warn!(%error, %url, "centralized event socket unavailable; retrying");
+            }
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+}
+
+fn start_event_stream(endpoint: String, table: Arc<SubscriptionTable>) {
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        handle.spawn(run_event_stream(endpoint, table));
+        return;
+    }
+    std::thread::spawn(move || {
+        if let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+        {
+            runtime.block_on(run_event_stream(endpoint, table));
+        }
+    });
 }
 
 #[cfg(test)]
