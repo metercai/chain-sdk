@@ -2,7 +2,7 @@
 
 本目录**不提交** `identity_chain.scale`。
 
-原因（见 `docs/implementation-plan.md` 决策 D-06）：
+原因（见 `docs/ChainSdk接口契约与实现规格书.md` §5.3）：
 
 1. 仓库内没有 identity-chain 的 pallet 名称、存储项名称与 SCALE 类型定义；
 2. 提交错误或过期的元数据会让 `ChainModeSdk` 编译期通过、运行时全部失败；

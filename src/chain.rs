@@ -69,6 +69,12 @@ impl ChainModeSdk {
     }
 }
 
+impl ChainModeSdk {
+    pub(crate) fn core(&self) -> &SdkCore {
+        &self.core
+    }
+}
+
 impl RoleGate for ChainModeSdk {
     fn role(&self) -> SdkRole {
         self.core.role

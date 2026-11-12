@@ -20,9 +20,11 @@ password_env = "CHAIN_KEYSTORE_PASSWORD"
 password_file = "./participant-keys/password"
 allow_auto_generate_password = true
 
+# 用 `mini_cli init-keys` 生成实际 KeyId 后填写（keyvault-core 按公钥生成，
+# 不接受自定义 local id）。以下为占位示例。
 [chain_sdk.key_vault.keys]
-operator = "chain-account/operator-1"                          # sr25519
-participant_did = "participant-did/did_web_mail_example_com"   # ed25519
+operator = "chain-account/<SS58>"                 # sr25519
+participant_did = "participant-did/did_key_<...>" # ed25519
 
 [chain_sdk.participant]
 controller_did = "did:web:mail.example.com:issuer"

@@ -3,37 +3,19 @@
 链能力契约（`Mock` / `Centralized` / `Chain` 三后端 × `Verifier` / `Issuer` 两角色），
 为服务端 Rust 应用提供**锚定读写、参与方查询、DID 解析、断言签名与事件订阅**。
 
-> **当前状态：P0 完成（v0.1.0），按 [`docs/implementation-plan.md`](docs/implementation-plan.md) 推进。**
+> **当前状态：v0.1.0 初始版本，已完成实现并通过 CI。**
 >
-> - 已完成（P0–P3）：公开契约、配置解析（TOML / env / override / 密码链）、
->   两类密钥 namespace 校验（S14）、角色门禁（`ensure_issuer` / `ensure_self` /
->   `ensure_signer`）；
-> - 已完成（P1–P2）：`Mock` 后端——读、写（锚定生命周期 / 自身管理写）、
->   双向索引、JSON 持久化、故障注入，以及 S9/S19 越权拦截；
-> - 已完成（P3–P4）：`did_adapter` 按角色装配 did-sdk（两角色均有 did-resolution，
->   仅 Issuer 加载 KeyVault 与两类密钥）；`did:key` 离线解析、`did:web` 委派 did-sdk；
-> - 已完成（P5–P6）：`Centralized` 后端——HTTP 只读、`get_anchor` TTL 缓存、
->   写请求签名（`op || "\n" || canonical JSON`）与 `x-chain-*` 头；
-> - 已完成（P7–P8）：参与方三段式绑定、委托锚定 fixtures、`business_types`
->   不参与鉴权、无治理接口与无 VC 存储方法检查；
-> - 已完成（P9）：三后端事件订阅（Mock 内存、Centralized WebSocket、Chain subxt）；
-> - 已完成（P10–P11）：Chain 后端（连接/健康检查/finalized 事件 + 角色拦截；
->   storage/extrinsic 按 D-06 返回 `Unsupported`）、`mini_cli`、Mock vs Centralized 一致性；
-> - 已完成（P12）：SD-JWT 选择性披露原语（`sd-v1` 盐化哈希、Disclosures、
->   `SD-VP-v1` 验证、锚定生命周期检查）；端到端交付仍依赖 did-sdk v0.2（D-16）；
-> - 已完成（P13）：GitHub 推送 `main`，`ci` / `rust-musl` / `consistency` / `roles`
->   四个 workflow 全绿（含 musl 双架构静态断言与 Windows/macOS 构建）；
-> - 本地门禁：93 个测试通过；详见 [`docs/implementation-report.md`](docs/implementation-report.md)；
-> - CI 结果：[`ci`](https://github.com/metercai/chain-sdk/actions/runs/43274367793) ·
-  [`rust-musl`](https://github.com/metercai/chain-sdk/actions/runs/43274367936) ·
-  [`consistency`](https://github.com/metercai/chain-sdk/actions/runs/43274367885) ·
-  [`roles`](https://github.com/metercai/chain-sdk/actions/runs/43274367598)。
+> - 契约与实现：[`docs/ChainSdk接口契约与实现规格书.md`](docs/ChainSdk接口契约与实现规格书.md)（唯一规范文档）
+> - 本地门禁：96 个测试通过；`cargo fmt --check`、`cargo clippy -D warnings` 干净
+> - CI：`ci` / `rust-musl` / `consistency` / `roles` 四个 workflow 全绿
+> - 依赖：`did-sdk` / `keyvault-core` 固定 **v0.2.0**；SD-JWT 与 did-sdk 的
+>   `Disclosure` / `verify_vp` / `VP-SD-v1` 对齐
 
 | 项目 | 内容 |
 |---|---|
 | 仓库 | [`metercai/chain-sdk`](https://github.com/metercai/chain-sdk)（`main` 已推送，4 个 workflow 全绿） |
 | 语言 | Rust 1.88.0（`edition 2024`，`resolver = "3"`） |
-| 依赖 | `keyvault-core` / `did-sdk` 均为**外部依赖**（`did-sdk` 仓库 `v0.1.0` tag） |
+| 依赖 | `keyvault-core` / `did-sdk` 均为**外部依赖**（`did-sdk` 仓库 `v0.2.0` tag） |
 | 跨平台 | 四目标矩阵，统一由 GitHub Actions runner 编译 |
 | 绑定 | **不提供** Python / Node / WASM 绑定 |
 
@@ -237,48 +219,51 @@ cargo run --locked --example mini_cli
 chain-sdk/
 ├── Cargo.toml / rust-toolchain.toml / .gitignore / README.md / LICENSE
 ├── src/
-│   ├── lib.rs            # ChainSdk trait（公开契约）
-│   ├── config.rs         # 配置模型 + 工厂入口（待实现）
+│   ├── lib.rs            # ChainSdk trait（17 方法）+ SdkCore
+│   ├── config.rs         # 配置解析（TOML / env / overrides / 密码链）
 │   ├── types.rs          # 数据模型
 │   ├── error.rs          # ChainSdkError + map_vault_err
-│   └── events.rs         # EventData / Unsubscribe
+│   ├── events.rs         # 回调表 / EventData / Unsubscribe
+│   ├── keys.rs           # 两类密钥 + namespace 唯一入口
+│   ├── role_gate.rs      # ensure_issuer / ensure_self / ensure_signer
+│   ├── did_adapter.rs    # DidPort（did-sdk v0.2 适配）
+│   ├── mock.rs           # Mock 后端
+│   ├── centralized.rs    # Centralized 后端（HTTP + WS + TTL）
+│   ├── chain.rs          # Chain 后端（subxt）
+│   └── sd.rs             # SD-JWT 签发/验证
 ├── examples/mini_cli.rs
-├── tests/                # 15 个验收测试文件（占位）
+├── tests/                # 16 个验收测试文件 + fixtures
 ├── configs/chain-sdk.toml.example
 ├── scripts/{build-rust-musl,run-consistency,verify-roles}.sh
 ├── .github/workflows/{ci,rust-musl,consistency,roles}.yml
 ├── metadata/README.md    # 为何不提交 identity_chain.scale
 └── docs/
-    ├── implementation-plan.md      # 实施步骤（评审入口）
-    ├── acceptance-checklist.md     # S1–S20 + SD-JWT 验收清单
-    └── specs/                      # 三份输入规格快照
+    └── ChainSdk接口契约与实现规格书.md   # 唯一规范文档（英文）
 ```
 
 ---
 
-## 10. VC 选择性披露（SD-JWT，规划中）
+## 10. VC 选择性披露（SD-JWT）
 
-`docs/specs/03-VC选择性披露特性补充附件.md` 定义在**不修改链上锚定原语**的前提下，
-用 SD-JWT 盐化哈希为 VC 增加选择性披露能力：
+选择性披露在**不修改链上锚定原语**的前提下实现：链上仍然只存 VC 整体哈希。
 
-- VC 的 `credentialSubject` 增加 `_sd`（盐化哈希数组）与 `_sd_alg`；
-- 发行方生成 `[salt, name, value]` Disclosures，与 VC 一并交付持有者；
-- 持有者构造 VP 时附带 `disclosures` 子集；
-- 验证方重算哈希并与 `_sd` 比对，再查链上锚定。
+| 产物 | 内容 |
+|---|---|
+| VC | `did_sdk::VerifiableCredential`，`credentialSubject._sd` + `_sd_alg`，锚定 id 在 `anchor_id` |
+| Disclosures | `did_sdk::Disclosure { salt, name, value }`，与 VC 一并交付持有者 |
+| VP | `did_sdk::VerifiablePresentation`，`disclosures: Some([...])` + holder proof |
+| 锚定 | `payload_hash` 覆盖去掉 `proof` / `anchor_id` 的 VC，生命周期语义不变 |
 
-本仓库的实现范围（评审决策 D-13～D-16）：
+- **Issuer**（本仓库）：生成 16 字节独立随机盐与 `_sd` 哈希、创建锚定、用
+  `participant-did/` 密钥签发 VC；
+- **Verifier**（本仓库）：复用 `did-sdk v0.2` 的 `verify_vp`（holder/VC/Disclosure），
+  再检查锚定 `revoked` / `valid_until` / `payload_hash`；
+- **持有者**（did-sdk v0.2）：`store_vc_with_disclosures`、`build_vp_selective` 构造
+  `VP-SD-v1` 出示。
 
-- **Issuer**：盐化哈希 + Disclosures 生成；
-- **Verifier**：Disclosure 哈希比对 + `get_anchor` 生命周期检查；
-- **did-sdk**：Disclosures 存储、用户选择与 VP 构造（**跨仓库**，需 did-sdk v0.2）。
-
-当前 `did-sdk 0.1.0` 的 `VerifiableCredential` 没有 `credentialStatus` 字段，
-`VerifiablePresentation` 没有 `disclosures` 字段，VP 签名输入也不覆盖 disclosures。
-因此端到端选择性披露**依赖 did-sdk 模型扩展**；`chain-sdk` 先以自包含的
-`SdCredential` / `SdPresentation` JSON 契约实现签发与验证原语，并在实施文档中
-记录跨仓库依赖。
-
----
+哈希公式与 `did-sdk` v0.2 完全一致：
+`SHA-256(base64url(salt) || base64url(name) || base64url(value))`。
+隐私边界（同一 VC 跨出示可关联、验证方合谋拼接不可防）见规格书 §7.7。
 
 ## 11. 安全说明
 
@@ -295,14 +280,7 @@ chain-sdk/
 
 | 文档 | 说明 |
 |---|---|
-| [`docs/implementation-plan.md`](docs/implementation-plan.md) | **实施步骤与评审决策（评审入口）** |
-| [`docs/acceptance-checklist.md`](docs/acceptance-checklist.md) | S1–S20 与 SD-JWT 验收项 |
-| [`docs/implementation-report.md`](docs/implementation-report.md) | P0–P12 实施记录、证据与偏差 |
-| [`docs/specs/01-...`](docs/specs/) | ChainSdk 接口契约与实现规格书 v2 |
-| [`docs/specs/02-...`](docs/specs/) | did-sdk 移除链上查询与 subxt 依赖的修订（R1） |
-| [`docs/specs/03-...`](docs/specs/) | VC 选择性披露特性补充附件 |
-
----
+| [`docs/ChainSdk接口契约与实现规格书.md`](docs/ChainSdk接口契约与实现规格书.md) | **唯一规范文档**：契约、后端、SD-JWT、配置、验收、状态 |
 
 ## 13. 未来扩展
 

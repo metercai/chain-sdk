@@ -27,6 +27,30 @@ pub(crate) trait DidPort: Send + Sync {
 
     /// 通过 HTTPS 解析 `did:web` 文档。
     async fn resolve_did_web(&self, did: &str) -> Result<DidDocument, ChainSdkError>;
+
+    /// 校验选择性披露 VP（holder 签名、challenge、VC 签名、Disclosure 哈希）。
+    ///
+    /// 锚定查询不在此处执行（由 `chain-sdk` 负责，R1）。
+    async fn verify_vp(
+        &self,
+        presentation: &did_sdk::VerifiablePresentation,
+        expected_challenge: &str,
+    ) -> Result<did_sdk::VpVerificationResult, ChainSdkError>;
+}
+
+/// 把 `DidSdkError` 映射为 `ChainSdkError`（SD-JWT 错误保留语义）。
+pub(crate) fn map_did_err(error: did_sdk::DidSdkError) -> ChainSdkError {
+    use did_sdk::DidSdkError as DE;
+    match error {
+        DE::DisclosureHashMismatch(name) => {
+            let _ = name;
+            ChainSdkError::DisclosureHashMismatch
+        }
+        DE::DisclosureDuplicate(name) => ChainSdkError::DisclosureDuplicate(name),
+        DE::DisclosureMissing(message) => ChainSdkError::DisclosureMissing(message),
+        DE::SdAlgUnsupported(alg) => ChainSdkError::SdAlgUnsupported(alg),
+        other => ChainSdkError::InvalidArgument(format!("did-sdk: {other}")),
+    }
 }
 
 /// 基于 `did-sdk<Server>` 的适配器。
@@ -78,6 +102,17 @@ impl DidPort for DidSdkAdapter {
                 ChainSdkError::InvalidArgument(format!("did:web {did}: {error}"))
             })?;
         Ok(convert_document(document))
+    }
+
+    async fn verify_vp(
+        &self,
+        presentation: &did_sdk::VerifiablePresentation,
+        expected_challenge: &str,
+    ) -> Result<did_sdk::VpVerificationResult, ChainSdkError> {
+        self.sdk
+            .verify_vp(presentation, expected_challenge)
+            .await
+            .map_err(map_did_err)
     }
 }
 

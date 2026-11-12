@@ -105,7 +105,7 @@ async fn issue_builds_sd_array_and_disclosures() {
         .unwrap();
 
     // I1/I2：_sd / _sd_alg 正确。
-    let subject = &issued.credential["credentialSubject"];
+    let subject = &issued.credential.credential_subject;
     assert_eq!(subject["_sd"].as_array().unwrap().len(), 6);
     assert_eq!(subject["_sd_alg"], "sha-256");
     assert_eq!(
@@ -147,15 +147,10 @@ async fn issue_builds_sd_array_and_disclosures() {
     let anchor = sdk.get_anchor(&issued.anchor_id).await.unwrap();
     assert_eq!(anchor.payload_hash, issued.payload_hash);
     assert_eq!(
-        issued.credential["credentialStatus"]["anchorId"],
-        serde_json::json!(issued.anchor_id)
+        issued.credential.anchor_id.as_deref(),
+        Some(issued.anchor_id.as_str())
     );
-    assert!(
-        !issued.credential["proof"]["jws"]
-            .as_str()
-            .unwrap()
-            .is_empty()
-    );
+    assert!(!issued.credential.proof.as_ref().unwrap().jws.is_empty());
 }
 
 #[tokio::test]
@@ -190,8 +185,8 @@ async fn salts_are_independent_across_credentials() {
             .unwrap();
         assert_ne!(left.salt, right.salt);
         assert_ne!(
-            chain_sdk::sd::disclosure_digest(&left.salt, &left.name, &left.value).unwrap(),
-            chain_sdk::sd::disclosure_digest(&right.salt, &right.name, &right.value).unwrap()
+            chain_sdk::sd::disclosure_digest(left).unwrap(),
+            chain_sdk::sd::disclosure_digest(right).unwrap()
         );
     }
     assert_eq!(

@@ -31,7 +31,7 @@
 //! # 实现状态
 //!
 //! 本提交是**初始化骨架**：公开契约已冻结，后端实现与测试按
-//! `docs/implementation-plan.md` 分阶段进行（P0–P12），评审通过后开始实现。
+//! `docs/ChainSdk接口契约与实现规格书.md`。
 
 pub mod centralized;
 pub mod chain;
@@ -61,7 +61,7 @@ pub use error::ChainSdkError;
 pub use events::{EventData, Unsubscribe};
 pub use mock::{FailureRule, MockChainSdk, MockState};
 pub use sd::{
-    SdDisclosure, SdExpected, SdIssueRequest, SdIssuedCredential, SdPresentation, SdProof,
+    SdDisclosure, SdExpected, SdIssueRequest, SdIssuedCredential, SdPresentation,
     SdVerificationReport, SelectiveDisclosure,
 };
 pub use types::{

@@ -260,6 +260,12 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     Ok(())
 }
 
+impl MockChainSdk {
+    pub(crate) fn core(&self) -> &SdkCore {
+        &self.core
+    }
+}
+
 impl RoleGate for MockChainSdk {
     fn role(&self) -> SdkRole {
         self.core.role

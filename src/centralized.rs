@@ -1,6 +1,6 @@
 //! `Centralized` 后端：HTTP 只读 + TTL 缓存（P5）；写请求签名在 P6。
 //!
-//! 端点契约见 `docs/implementation-plan.md` 附录 C。只对 `get_anchor` 启用 TTL
+//! 端点契约见 `docs/ChainSdk接口契约与实现规格书.md` §5.2。只对 `get_anchor` 启用 TTL
 //! 缓存；`cache_ttl_secs = 0` 关闭缓存。
 
 use std::collections::HashMap;
@@ -253,6 +253,12 @@ fn status_error(status: StatusCode, op: &str) -> ChainSdkError {
             ChainSdkError::ChainUnavailable(format!("{op}: HTTP {status}"))
         }
         _ => ChainSdkError::NetworkError(format!("{op}: HTTP {status}")),
+    }
+}
+
+impl CentralizedChainSdk {
+    pub(crate) fn core(&self) -> &SdkCore {
+        &self.core
     }
 }
 

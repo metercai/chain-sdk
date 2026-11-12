@@ -1,4 +1,5 @@
-//! SD-JWT 验证侧（V1–V7）：holder/VC 签名、Disclosure 比对、锚定生命周期。
+//! SD-JWT verification (V1–V7): holder/VC signatures, disclosure hashes,
+//! anchor lifecycle — using `did-sdk` v0.2 VP types and `VP-SD-v1`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -8,18 +9,16 @@ use chain_sdk::config::{
     ChainSdkConfig, ChainSdkMode, DidConfig, KeyVaultConfig, KeyVaultKeys, ParticipantConfig,
     SdkRole,
 };
-use chain_sdk::sd::{
-    SdDisclosure, SdExpected, SdIssueRequest, SdPresentation, SdProof, vp_signing_input,
-};
+use chain_sdk::sd::{SdDisclosure, SdExpected, SdIssueRequest, vp_signing_input};
 use chain_sdk::{
     AnchorType, ChainSdk, ChainSdkError, MockChainSdk, MockState, SelectiveDisclosure,
     build_mock_chain_sdk_with_state,
 };
+use did_sdk::{Proof, VerifiableCredential, VerifiablePresentation};
 use keyvault_core::{
     FileKeystore, KeyAlgorithm, KeyId, KeyNamespace, KeyVault, MemoryKeystore, PublicKey,
 };
 use secrecy::SecretString;
-use serde_json::Value;
 
 const CHALLENGE: &str = "challenge-1";
 const DOMAIN: &str = "verifier.example.com";
@@ -124,11 +123,18 @@ async fn holder() -> Holder {
 
 async fn present(
     holder: &Holder,
-    credential: &Value,
+    credential: &VerifiableCredential,
     disclosures: Vec<SdDisclosure>,
     challenge: &str,
-) -> SdPresentation {
-    let input = vp_signing_input(&holder.did, challenge, DOMAIN, credential, &disclosures).unwrap();
+) -> VerifiablePresentation {
+    let input = vp_signing_input(
+        &holder.did,
+        challenge,
+        DOMAIN,
+        std::slice::from_ref(credential),
+        &disclosures,
+    )
+    .unwrap();
     let signature = holder
         .vault
         .sign_checked(
@@ -139,20 +145,20 @@ async fn present(
         )
         .await
         .unwrap();
-    SdPresentation {
+    VerifiablePresentation {
         context: vec!["https://www.w3.org/ns/credentials/v2".into()],
         types: vec!["VerifiablePresentation".into()],
         holder: holder.did.clone(),
-        verifiable_credential: credential.clone(),
-        disclosures,
+        verifiable_credential: vec![credential.clone()],
         challenge: challenge.into(),
         domain: DOMAIN.into(),
-        proof: SdProof {
+        disclosures: Some(disclosures),
+        proof: Some(Proof {
             type_: "Ed25519Signature2020".into(),
             created: 0,
             verification_method: format!("{}#key-1", holder.did),
             jws: bs58::encode(signature.0).into_string(),
-        },
+        }),
     }
 }
 
@@ -265,7 +271,7 @@ async fn tampered_credential_is_rejected() {
         .unwrap();
 
     let mut credential = issued.credential.clone();
-    credential["credentialSubject"]["idCardNumber"] = serde_json::json!("000000000000000000");
+    credential.credential_subject["idCardNumber"] = serde_json::json!("000000000000000000");
     let presentation = present(&holder, &credential, vec![], CHALLENGE).await;
 
     let error = sdk

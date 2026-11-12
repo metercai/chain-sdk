@@ -7,7 +7,7 @@
 //! mini_cli create-anchor <type> <payload_hash> [valid_until]
 //! ```
 //!
-//! 配置解析顺序见 `docs/implementation-plan.md` 附录 B；可用
+//! 配置解析顺序见 `docs/ChainSdk接口契约与实现规格书.md` §8；可用
 //! `CHAIN_SDK_HOME` / `CHAIN_SDK_CONFIG_FILE` / 环境变量覆盖。
 
 use std::process::ExitCode;
