@@ -137,7 +137,7 @@ chain-sdk/
 | 检查 | 结果 |
 |---|---|
 | `git init -b main` | 见 §5 P12（初始化提交后执行） |
-| `cargo generate-lockfile` | 完成（`Cargo.lock`，471 个包锁定） |
+| `cargo generate-lockfile` | 完成（`Cargo.lock`，472 个包锁定） |
 | `cargo check --locked --all-targets --all-features` | **通过**（1.88.0，44.7s） |
 | `cargo fmt --all -- --check` | **通过** |
 | `cargo clippy --locked --all-targets --all-features -- -D warnings` | **通过**（零告警） |
