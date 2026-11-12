@@ -1,0 +1,62 @@
+{
+  "anchors": {
+    "anchor:1": {
+      "anchor_id": "anchor:1",
+      "anchor_type": { "kind": "EmailBinding" },
+      "submitter_id": 4,
+      "issuer_did": "did:web:mail.example.com:issuer",
+      "delegated_by_did": null,
+      "payload_hash": "blake2b:deadbeef",
+      "revoked": false,
+      "created_at": 0,
+      "valid_until": 0
+    },
+    "anchor:delegated-1": {
+      "anchor_id": "anchor:delegated-1",
+      "anchor_type": { "kind": "IssuedVc" },
+      "submitter_id": 7,
+      "issuer_did": "did:key:zA",
+      "delegated_by_did": "did:web:proxy.example.com",
+      "payload_hash": "blake2b:cafe",
+      "revoked": false,
+      "created_at": 0,
+      "valid_until": 0
+    }
+  },
+  "participants": {
+    "4": {
+      "participant_id": 4,
+      "controller_did": "did:web:mail.example.com:issuer",
+      "operator": "5GrwvaEF...",
+      "chain_role": "Issuer",
+      "business_types": ["EmailBinding", "DomainControl"],
+      "authorized_domains": ["mail.example.com"],
+      "active": true
+    },
+    "7": {
+      "participant_id": 7,
+      "controller_did": "did:web:proxy.example.com",
+      "operator": "5FHneW...",
+      "chain_role": "Issuer",
+      "business_types": ["Delegation"],
+      "authorized_domains": [],
+      "active": true
+    }
+  },
+  "did_participant": {
+    "did:web:mail.example.com:issuer": 4,
+    "did:web:proxy.example.com": 7
+  },
+  "account_participant": {
+    "5GrwvaEF...": 4,
+    "5FHneW...": 7
+  },
+  "registered_anchor_types": [
+    { "kind": "EmailBinding" },
+    { "kind": "DomainControl" },
+    { "kind": "IssuedVc" }
+  ],
+  "dids": {},
+  "current_time": 1000,
+  "next_anchor_seq": 1
+}

@@ -1,0 +1,35 @@
+# Issuer：读写角色。加载 `chain-account/`（sr25519）与 `participant-did/`（ed25519）两类密钥。
+[chain_sdk]
+mode = "mock"
+role = "issuer"
+participant_id = 4
+cache_ttl_secs = 300
+
+[chain_sdk.key_vault]
+scheme = "memory-keystore"
+path = "/tmp/unused"
+password_env = "UNUSED"
+password_file = "/tmp/unused"
+allow_auto_generate_password = false
+
+[chain_sdk.key_vault.keys]
+operator = "chain-account/operator-1"
+participant_did = "participant-did/did_web_mail_example_com"
+
+[chain_sdk.participant]
+controller_did = "did:web:mail.example.com:issuer"
+
+[chain_sdk.capabilities]
+did_resolution = true
+vc_wallet = false
+issuer_signing = true
+
+[chain_sdk.centralized]
+endpoint = "http://127.0.0.1:8080"
+
+[chain_sdk.chain]
+endpoint = "ws://127.0.0.1:9944"
+require_finalized_node = true
+
+[chain_sdk.did]
+vc_storage_path = "/tmp/unused-vc-store"

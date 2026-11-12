@@ -1,0 +1,24 @@
+# 构建产物
+/target/
+/dist/
+**/*.rs.bk
+
+# 本地工具链与依赖缓存（沙箱环境专用，不提交）
+/.rustup/
+/.cargo-home/
+/.cargo/config.toml
+/.dsh-tmp/
+
+# 本地配置与密钥（绝不提交）
+.env
+*.log
+participant-keys/
+participant-vc-store/
+*.password
+*.vc_password
+
+# 编辑器 / 操作系统
+.DS_Store
+.idea/
+.vscode/
+*.swp

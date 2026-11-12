@@ -1,0 +1,36 @@
+# Verifier：只读角色。不加载 KeyVault，因此不需要密码。
+# 密钥段保留仅为满足配置结构完整性，实际不会被读取。
+[chain_sdk]
+mode = "mock"
+role = "verifier"
+participant_id = 0
+cache_ttl_secs = 300
+
+[chain_sdk.key_vault]
+scheme = "memory-keystore"
+path = "/tmp/unused"
+password_env = "UNUSED"
+password_file = "/tmp/unused"
+allow_auto_generate_password = false
+
+[chain_sdk.key_vault.keys]
+operator = "chain-account/unused"
+participant_did = "participant-did/unused"
+
+[chain_sdk.participant]
+controller_did = "did:web:verifier.example.com"
+
+[chain_sdk.capabilities]
+did_resolution = true
+vc_wallet = false
+issuer_signing = false
+
+[chain_sdk.centralized]
+endpoint = "http://127.0.0.1:8080"
+
+[chain_sdk.chain]
+endpoint = "ws://127.0.0.1:9944"
+require_finalized_node = true
+
+[chain_sdk.did]
+vc_storage_path = "/tmp/unused-vc-store"

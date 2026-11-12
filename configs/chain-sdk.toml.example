@@ -1,0 +1,44 @@
+# chain-sdk 配置样例。
+#
+# 优先级：显式 ConfigOverrides > 环境变量 > 本文件 > 内置默认值。
+# 密码链（仅 role = "issuer" 解析）：CHAIN_KEYSTORE_PASSWORD → password_file
+# → allow_auto_generate_password 自动生成 → 报错。
+
+[chain_sdk]
+mode = "chain"                 # mock / centralized / chain
+role = "issuer"                # verifier / issuer（role = "app" 为 issuer 别名）
+participant_id = 4
+cache_ttl_secs = 300
+valid_until_refresh_window_secs = 86400
+require_finalized_node = true
+
+# Issuer 必填；Verifier 不加载 KeyVault。
+[chain_sdk.key_vault]
+scheme = "file-keystore"
+path = "./participant-keys"
+password_env = "CHAIN_KEYSTORE_PASSWORD"
+password_file = "./participant-keys/password"
+allow_auto_generate_password = true
+
+[chain_sdk.key_vault.keys]
+operator = "chain-account/operator-1"                          # sr25519
+participant_did = "participant-did/did_web_mail_example_com"   # ed25519
+
+[chain_sdk.participant]
+controller_did = "did:web:mail.example.com:issuer"
+
+[chain_sdk.capabilities]
+did_resolution = true
+vc_wallet = false              # POC 默认关闭
+issuer_signing = true          # 仅 Issuer；Verifier 构造时强制 false
+
+[chain_sdk.centralized]
+endpoint = "http://localhost:8080"
+
+[chain_sdk.chain]
+endpoint = "wss://rpc.identity-chain.com:9944"
+require_finalized_node = true
+
+# did-sdk<Server> 的 VC 存储目录（由 did-sdk 管理，chain-sdk 不读写 VC 文件）。
+[chain_sdk.did]
+vc_storage_path = "./participant-vc-store"

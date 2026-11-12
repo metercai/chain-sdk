@@ -1,0 +1,91 @@
+name: rust-musl
+
+# 跨硬件平台编译统一在 GitHub Actions runner 执行（本地不做交叉编译）：
+#   x86_64-unknown-linux-musl  完全静态
+#   aarch64-unknown-linux-musl 完全静态
+#   aarch64-apple-darwin
+#   x86_64-pc-windows-msvc
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-musl-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: aarch64-apple-darwin
+            os: macos-15
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@1.88.0
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install zig
+        if: contains(matrix.target, 'musl')
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.13.0
+
+      - name: Install cargo-zigbuild
+        if: contains(matrix.target, 'musl')
+        run: cargo install cargo-zigbuild --locked
+
+      - name: Build musl (static)
+        if: contains(matrix.target, 'musl')
+        shell: bash
+        run: |
+          cargo zigbuild --locked --target ${{ matrix.target }} --release --example mini_cli
+
+      - name: Build native target
+        if: ${{ !contains(matrix.target, 'musl') }}
+        shell: bash
+        run: |
+          cargo build --locked --target ${{ matrix.target }} --release --example mini_cli
+
+      - name: Verify static (musl only)
+        if: contains(matrix.target, 'musl')
+        shell: bash
+        run: |
+          BIN="target/${{ matrix.target }}/release/examples/mini_cli"
+          file "$BIN"
+          if file "$BIN" | grep -qE 'statically linked|static-pie linked'; then
+            echo "[OK] static"
+          else
+            echo "[FAIL] not static"
+            exit 1
+          fi
+          ldd "$BIN" 2>&1 | grep -E 'not a dynamic executable|not found' || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chain-sdk-mini-cli-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/examples/mini_cli
+            target/${{ matrix.target }}/release/examples/mini_cli.exe
+          if-no-files-found: error
+          overwrite: true

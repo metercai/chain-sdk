@@ -1,0 +1,11 @@
+{
+  "anchor_id": "anchor:delegated-1",
+  "anchor_type": { "kind": "IssuedVc" },
+  "submitter_id": 7,
+  "issuer_did": "did:key:zA",
+  "delegated_by_did": "did:web:proxy.example.com",
+  "payload_hash": "blake2b:cafe",
+  "revoked": false,
+  "created_at": 0,
+  "valid_until": 0
+}

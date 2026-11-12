@@ -1,0 +1,56 @@
+name: roles
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: roles-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  matrix:
+    name: role matrix + boundaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Role tests
+        run: |
+          cargo test --locked \
+            --test role_matrix \
+            --test role_gate \
+            --test keyvault_integration \
+            --test capabilities \
+            --test keys_namespace \
+            --test participant_binding
+
+      - name: Assert no governance methods in src (S18)
+        run: |
+          if grep -rnE 'fn (register_participant|deactivate_participant|update_operator|register_anchor_type|submit_delegated_anchor)\b' src/; then
+            echo "[FAIL] governance method found in chain-sdk (belongs to chain-owner-sdk)"
+            exit 1
+          fi
+          echo "[OK] no governance methods"
+
+      - name: Assert no VC storage methods in src (S17)
+        run: |
+          if grep -rnE 'fn (store_vc|get_vc|list_vcs|remove_vc)\b' src/; then
+            echo "[FAIL] VC storage method found in chain-sdk (belongs to did-sdk)"
+            exit 1
+          fi
+          echo "[OK] no VC storage methods"
+
+      - name: Assert did-sdk has no subxt dependency (R1)
+        run: |
+          if cargo tree --locked -p chain-sdk -e normal | grep -A1 'did-sdk v' | grep -q 'subxt'; then
+            echo "[FAIL] did-sdk must not depend on subxt (R1)"
+            exit 1
+          fi
+          echo "[OK] did-sdk has no direct subxt dependency"

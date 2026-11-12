@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: fmt + clippy + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.88.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (all targets, all features)
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+
+      - name: Test (all features)
+        run: cargo test --locked --all-features
+
+      - name: Contract completeness (S1)
+        run: |
+          for method in \
+            health_check get_anchor list_anchors \
+            get_participant get_participant_by_did list_participants \
+            resolve_did resolve_did_key resolve_did_web \
+            create_anchor revoke_anchor renew_anchor \
+            update_authorized_domains update_controller_did \
+            sign_participant_assertion subscribe_event
+          do
+            grep -q "fn ${method}" src/lib.rs || { echo "missing trait method: ${method}"; exit 1; }
+          done
+          echo "[OK] ChainSdk contract complete"
