@@ -132,7 +132,7 @@ impl SdkCore {
 pub trait ChainSdk: SelectiveDisclosure + Send + Sync {
     // ===== 身份 =====
 
-    /// 本参与方的 `did:web`（SD-JWT 签发时的 `issuer` 字段）。
+    /// 本参与方的 `did:web`（selective disclosure 签发时的 `issuer` 字段）。
     fn participant_did(&self) -> &str;
 
     // ===== 连接管理 =====

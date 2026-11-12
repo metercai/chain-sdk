@@ -1,4 +1,4 @@
-//! SD-JWT verification (V1–V7): holder/VC signatures, disclosure hashes,
+//! Selective-disclosure verification (V1–V7): holder/VC signatures, disclosure hashes,
 //! anchor lifecycle — using `did-sdk` v0.2 VP types and `VP-SD-v1`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]

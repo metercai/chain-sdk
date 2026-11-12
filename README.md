@@ -8,7 +8,7 @@
 > - 契约与实现：[`docs/ChainSdk-Interface-Contract.md`](docs/ChainSdk-Interface-Contract.md)（唯一规范文档）
 > - 本地门禁：96 个测试通过；`cargo fmt --check`、`cargo clippy -D warnings` 干净
 > - CI：`ci` / `rust-musl` / `consistency` / `roles` 四个 workflow 全绿
-> - 依赖：`did-sdk` / `keyvault-core` 固定 **v0.2.0**；SD-JWT 与 did-sdk 的
+> - 依赖：`did-sdk` / `keyvault-core` 固定 **v0.2.0**；选择性披露与 did-sdk 的
 >   `Disclosure` / `verify_vp` / `VP-SD-v1` 对齐
 
 | 项目 | 内容 |
@@ -230,7 +230,7 @@ chain-sdk/
 │   ├── mock.rs           # Mock 后端
 │   ├── centralized.rs    # Centralized 后端（HTTP + WS + TTL）
 │   ├── chain.rs          # Chain 后端（subxt）
-│   └── sd.rs             # SD-JWT 签发/验证
+│   └── sd.rs             # 选择性披露签发/验证
 ├── examples/mini_cli.rs
 ├── tests/                # 17 个验收测试文件 + fixtures
 ├── configs/chain-sdk.toml.example
@@ -243,7 +243,7 @@ chain-sdk/
 
 ---
 
-## 10. VC 选择性披露（SD-JWT）
+## 10. VC 选择性披露（盐化哈希，非 JWT）
 
 选择性披露在**不修改链上锚定原语**的前提下实现：链上仍然只存 VC 整体哈希。
 
@@ -280,14 +280,14 @@ chain-sdk/
 
 | 文档 | 说明 |
 |---|---|
-| [`docs/ChainSdk-Interface-Contract.md`](docs/ChainSdk-Interface-Contract.md) | **唯一规范文档**：契约、后端、SD-JWT、配置、验收、状态 |
+| [`docs/ChainSdk-Interface-Contract.md`](docs/ChainSdk-Interface-Contract.md) | **唯一规范文档**：契约、后端、选择性披露、配置、验收、状态 |
 
 ## 13. 未来扩展
 
 - `keyvault-device` / `keyvault-server` 通过 `keyvault.scheme` 切换，只新增 crate +
   在 `build_vault` 加 feature 门控分支；`ChainSdk` trait 与 `SdkRole` 不改动；
 - `chain-owner-sdk` 复用本 crate 的读能力与 `keys::sign_extrinsic`，扩展治理接口；
-- BBS+ 作为选择性披露的并存机制（`_bbs` 字段），不替换 SD-JWT。
+- BBS+ 作为选择性披露的并存机制（`_bbs` 字段），不替换当前选择性披露机制。
 
 ## 14. 许可
 

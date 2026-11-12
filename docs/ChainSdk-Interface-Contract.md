@@ -31,7 +31,7 @@ chain-owner-sdk          governance: register_participant, update_operator,
         │ depends on
         ▼
 chain-sdk                anchor read/write, participant read, DID resolution,
-                         assertion signing, events, SD-JWT issuance/verification
+                         assertion signing, events, selective-disclosure issuance/verification
         │ depends on
         ├── did-sdk v0.2        DID methods + VC wallet + SD disclosures (no chain access)
         └── keyvault-core v0.2  KeyVault trait, FileKeystore, crypto primitives
@@ -176,7 +176,7 @@ pub type Unsubscribe = Box<dyn FnOnce() + Send + Sync>;
 
 **Semantics**
 
-- `participant_did` returns `participant.controller_did`; required for SD-JWT issuance.
+- `participant_did` returns `participant.controller_did`; required for selective disclosure issuance.
 - `valid_until == 0` means permanent. `renew_anchor` on a permanent anchor returns
   `AnchorPermanent`; `revoke_anchor` on a revoked anchor returns `AnchorRevoked`.
 - `update_*` may only target the instance's own `participant_id`; otherwise `Unauthorized`.
@@ -433,7 +433,7 @@ authorization. The only inputs are `SdkRole`, `chain_role` (informational) and
 
 ---
 
-## 7. VC Selective Disclosure (SD-JWT)
+## 7. VC Selective Disclosure (Salted Hash)
 
 ### 7.1 Model
 
@@ -672,7 +672,7 @@ Cross-compilation is performed **only on GitHub Actions runners**. Toolchain: Ru
 - Centralized writes sign `op + canonical JSON`; the canonical form rejects floats and is
   documented so the service can reproduce it byte-for-byte.
 - `UserRejected` is propagated 1:1 from the vault, never string-matched.
-- SD-JWT verification reuses `did-sdk` v0.2 for holder/VC/disclosure checks; anchor state is
+- Selective-disclosure verification reuses `did-sdk` v0.2 for holder/VC/disclosure checks; anchor state is
   checked by `chain-sdk`.
 - Mock mode is for tests only; `health_check.mode` exposes the active backend.
 - The privacy limits in §7.7 are part of the contract and must not be overstated.
@@ -751,7 +751,7 @@ are validated in that repository.
 - Centralized service contract is the one defined in §5.2; it must be confirmed with the
   centralized-chain implementation (open item).
 - Canonical JSON is deterministic for this implementation; RFC 8785 (JCS) is not yet adopted.
-- `sd-jwt` Cargo feature is reserved; the implementation is always compiled.
+- `selective-disclosure` Cargo feature is reserved; the implementation is always compiled.
 
 ---
 

@@ -41,7 +41,7 @@ tracing = "0.1"
 secrecy = "0.10"
 hex = "0.4"
 dirs = "6"
-# SD-JWT（sha-256 盐化哈希；base64url；base58 proof 编码）
+# Salted-hash selective disclosure (SHA-256; base64url; base58 proof encoding).
 sha2 = "0.10"
 base64 = "0.22"
 bs58 = "0.5"
@@ -100,8 +100,8 @@ default = []
 did-resolution = []
 vc-wallet = []
 issuer-signing = []
-# VC 选择性披露（SD-JWT 机制，见 规格书 §7）。
-sd-jwt = []
+# VC salted-hash selective disclosure (see spec §7).
+selective-disclosure = []
 # 未来密钥后端扩展点。
 device-keystore = []
 server-keystore = []

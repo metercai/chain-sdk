@@ -1,4 +1,4 @@
-//! SD-JWT 签发侧（I1–I6）：盐化哈希、`_sd`、Disclosures、锚定不变。
+//! Selective-disclosure issuance (I1–I6): salted hashes, `_sd`, disclosures, unchanged anchor.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

@@ -38,7 +38,7 @@ pub(crate) trait DidPort: Send + Sync {
     ) -> Result<did_sdk::VpVerificationResult, ChainSdkError>;
 }
 
-/// 把 `DidSdkError` 映射为 `ChainSdkError`（SD-JWT 错误保留语义）。
+/// 把 `DidSdkError` 映射为 `ChainSdkError`（selective disclosure 错误保留语义）。
 pub(crate) fn map_did_err(error: did_sdk::DidSdkError) -> ChainSdkError {
     use did_sdk::DidSdkError as DE;
     match error {

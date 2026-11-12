@@ -1,4 +1,4 @@
-//! VC selective disclosure (SD-JWT) on top of `did-sdk` v0.2.
+//! VC-native salted-hash selective disclosure on top of `did-sdk` v0.2.
 //!
 //! Contract (see `docs/ChainSdk-Interface-Contract.md`):
 //!
