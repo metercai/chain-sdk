@@ -5,11 +5,13 @@
 
 > **当前状态：P0 完成（v0.1.0），按 [`docs/implementation-plan.md`](docs/implementation-plan.md) 推进。**
 >
-> - 已完成（P0）：公开契约、配置解析（TOML / env / override / 密码链）、
+> - 已完成（P0–P3）：公开契约、配置解析（TOML / env / override / 密码链）、
 >   两类密钥 namespace 校验（S14）、角色门禁（`ensure_issuer` / `ensure_self` /
->   `ensure_signer`）、占位后端（读方法 `Unsupported`，断言签名可用）；
-> - 进行中（P1）：Mock 后端读、持久化与故障注入；
-> - 本地门禁：10 个配置测试 + 7 个 namespace/签名测试通过；
+>   `ensure_signer`）；
+> - 已完成（P1–P2）：`Mock` 后端——读、写（锚定生命周期 / 自身管理写）、
+>   双向索引、JSON 持久化、故障注入，以及 S9/S19 越权拦截；
+> - 进行中（P4）：`did_adapter` 按角色装配 did-sdk；
+> - 本地门禁：41 个测试通过（配置 10、namespace 7、Mock 8、角色 10、单元 6）；
 > - GitHub 仓库尚未创建（用户选择先本地评审，见实施文档 D-18）。
 
 | 项目 | 内容 |

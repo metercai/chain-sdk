@@ -765,15 +765,12 @@ fn validate_for_build(config: &ChainSdkConfig) -> Result<(), ChainSdkError> {
     }
 }
 
-/// 按配置构造 `Arc<dyn ChainSdk>`。
+/// 装配三个后端共享的 [`SdkCore`]。
 ///
-/// - Issuer：加载 `KeyVault`（`file-keystore` 必须有已解析密码）+ 两类密钥；
-/// - Verifier：不加载 `KeyVault`（S17）；
-/// - 两角色都装配 `did-sdk`（P4 完成，见 `docs/implementation-plan.md`）。
-///
-/// 初始化阶段返回占位实现：读方法返回 `Unsupported`，写方法先执行角色门禁
-/// 再返回 `Unsupported`；断言签名已可用。
-pub fn build_chain_sdk(config: &ChainSdkConfig) -> Result<Arc<dyn ChainSdk>, ChainSdkError> {
+/// - 收敛能力开关（Verifier 强制 `issuer_signing = false`）；
+/// - Issuer 加载 `KeyVault` 与两类密钥（前缀校验，S14）；
+/// - Verifier 不加载 `KeyVault`（S17）。
+fn assemble_core(config: &ChainSdkConfig) -> Result<SdkCore, ChainSdkError> {
     let mut config = config.clone();
     config.capabilities = config.capabilities.effective_for(config.role);
     validate_for_build(&config)?;
@@ -791,11 +788,43 @@ pub fn build_chain_sdk(config: &ChainSdkConfig) -> Result<Arc<dyn ChainSdk>, Cha
     };
 
     let role = config.role;
-    let core = SdkCore {
+    Ok(SdkCore {
         vault,
         config,
         role,
         keys,
-    };
-    Ok(Arc::new(crate::placeholder::PlaceholderChainSdk::new(core)))
+    })
+}
+
+/// 按配置构造 `Arc<dyn ChainSdk>`。
+///
+/// - `Mock`：返回 [`crate::MockChainSdk`]（读、持久化、故障注入；写操作按 P2 推进）；
+/// - `Centralized` / `Chain`：当前返回占位实现（P5 / P10 替换）。
+///
+/// Issuer 会加载 `KeyVault` 与两类密钥；Verifier 不加载 `KeyVault`（S17）。
+pub fn build_chain_sdk(config: &ChainSdkConfig) -> Result<Arc<dyn ChainSdk>, ChainSdkError> {
+    let core = assemble_core(config)?;
+    match core.config.mode {
+        ChainSdkMode::Mock => Ok(Arc::new(crate::mock::MockChainSdk::from_core(core)?)),
+        ChainSdkMode::Centralized | ChainSdkMode::Chain => {
+            Ok(Arc::new(crate::placeholder::PlaceholderChainSdk::new(core)))
+        }
+    }
+}
+
+/// 构造具体的 Mock 后端（故障注入、状态断言等测试需要具体类型）。
+pub fn build_mock_chain_sdk(
+    config: &ChainSdkConfig,
+) -> Result<Arc<crate::mock::MockChainSdk>, ChainSdkError> {
+    let core = assemble_core(config)?;
+    Ok(Arc::new(crate::mock::MockChainSdk::from_core(core)?))
+}
+
+/// 用调用方提供的状态构造 Mock 后端（fixtures / 测试）。
+pub fn build_mock_chain_sdk_with_state(
+    config: &ChainSdkConfig,
+    state: crate::mock::MockState,
+) -> Result<Arc<crate::mock::MockChainSdk>, ChainSdkError> {
+    let core = assemble_core(config)?;
+    Ok(Arc::new(crate::mock::MockChainSdk::with_state(core, state)))
 }

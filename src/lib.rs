@@ -37,6 +37,7 @@ pub mod config;
 pub mod error;
 pub mod events;
 pub mod keys;
+pub mod mock;
 pub mod types;
 
 mod placeholder;
@@ -48,10 +49,12 @@ use async_trait::async_trait;
 
 pub use config::{
     Capabilities, ChainSdkConfig, ChainSdkMode, ConfigOverrides, DidConfig, KeyVaultConfig,
-    KeyVaultKeys, ParticipantConfig, SdkRole, build_chain_sdk, resolve_config,
+    KeyVaultKeys, MockConfig, ParticipantConfig, SdkRole, build_chain_sdk, build_mock_chain_sdk,
+    build_mock_chain_sdk_with_state, resolve_config,
 };
 pub use error::ChainSdkError;
 pub use events::{EventData, Unsubscribe};
+pub use mock::{FailureRule, MockChainSdk, MockState};
 pub use types::{
     AnchorRecord, AnchorType, AssertionPurpose, BusinessType, ChainRole, DidDocument, DidRecord,
     Ed25519PublicKey, Ed25519Signature, HealthStatus, ParticipantRecord, Sr25519Signature,
@@ -72,6 +75,31 @@ pub(crate) struct SdkCore {
     pub(crate) role: SdkRole,
     /// 两类密钥（仅 Issuer）。
     pub(crate) keys: Option<crate::keys::LoadedKeys>,
+}
+
+impl SdkCore {
+    /// 统一断言签名入口：三个后端共用。
+    pub(crate) async fn sign_participant_assertion(
+        &self,
+        payload: &[u8],
+        purpose: AssertionPurpose,
+    ) -> Result<Ed25519Signature, ChainSdkError> {
+        let vault = self
+            .vault
+            .as_ref()
+            .ok_or_else(|| ChainSdkError::SignerUnavailable("issuer requires KeyVault".into()))?;
+        let keys = self
+            .keys
+            .as_ref()
+            .ok_or_else(|| ChainSdkError::SignerUnavailable("keys not loaded".into()))?;
+        crate::keys::sign_participant_assertion_inner(
+            vault.as_ref(),
+            &keys.participant_did,
+            payload,
+            purpose,
+        )
+        .await
+    }
 }
 
 /// 链能力的统一契约：三种后端（Mock / Centralized / Chain）× 两种角色
