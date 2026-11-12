@@ -14,8 +14,10 @@
 >   仅 Issuer 加载 KeyVault 与两类密钥）；`did:key` 离线解析、`did:web` 委派 did-sdk；
 > - 已完成（P5–P6）：`Centralized` 后端——HTTP 只读、`get_anchor` TTL 缓存、
 >   写请求签名（`op || "\n" || canonical JSON`）与 `x-chain-*` 头；
-> - 进行中（P7）：参与方身份绑定与委托锚定 fixtures；
-> - 本地门禁：64 个测试通过；
+> - 已完成（P7–P8）：参与方三段式绑定、委托锚定 fixtures、`business_types`
+>   不参与鉴权、无治理接口与无 VC 存储方法检查；
+> - 进行中（P9）：三后端事件订阅；
+> - 本地门禁：72 个测试通过；
 > - GitHub 仓库尚未创建（用户选择先本地评审，见实施文档 D-18）。
 
 | 项目 | 内容 |

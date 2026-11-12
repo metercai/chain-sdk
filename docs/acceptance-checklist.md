@@ -19,7 +19,7 @@
 | 本地 A1 | `cargo check --locked --all-targets --all-features` | ✅ 通过（44.7s） |
 | 本地 A2 | `cargo fmt --all -- --check` | ✅ 通过 |
 | 本地 A2 | `cargo clippy --locked --all-targets --all-features -- -D warnings` | ✅ 零告警 |
-| 本地 A3 | `cargo test --locked --all-features` | ✅ 64 tests（P0–P6） |
+| 本地 A3 | `cargo test --locked --all-features` | ✅ 72 tests（P0–P8） |
 | 依赖边界 | 无 `openssl` / `native-tls` | ✅ |
 | R1 边界 | `did-sdk` 依赖树无 `subxt` | ✅ 0 处 |
 | GitHub | 仓库创建 + 4 workflow 全绿 | ⏳ 待 D-18 |
@@ -44,12 +44,12 @@
 | S12 | 一致性测试 | Mock vs Centralized 同结果 | ⏳ | `tests/consistency.rs` |
 | S13 | `keyvault-core` 集成 | `UserRejected` / namespace 错误映射 | ⏳ | `tests/keyvault_integration.rs` |
 | **S14** | **namespace 隔离** | 错误前缀 → `KeyNamespaceViolation` | ✅ P0 | `cargo test --test keys_namespace`（7 用例） |
-| **S15** | **参与方身份绑定** | DID ↔ id ↔ operator 双向索引 | 🟡 索引读/迁移已通过；fixtures 全量待 P7 | `tests/role_gate.rs::issuer_updates_own_controller_did_and_index` |
-| **S16** | **委托锚定语义** | `issuer_did` 信任根 / `submitter_id` / `delegated_by_did` | ⏳ | `tests/participant_binding.rs` |
+| **S15** | **参与方身份绑定** | DID ↔ id ↔ operator 双向索引 | ✅ P7 | `tests/participant_binding.rs`（5） |
+| **S16** | **委托锚定语义** | `issuer_did` 信任根 / `submitter_id` / `delegated_by_did` | ✅ P7 | `tests/participant_binding.rs`（fixture 等价） |
 | **S17** | **按角色装配** | Verifier 无 vault / 有 did；Issuer 两者均有 | ✅ P4 | `tests/capabilities.rs`（5）+ `src/config.rs` 单元测试（3） |
-| **S18** | **无治理接口** | trait 无 5 个治理方法；CI grep | ⏳ | `tests/no_governance.rs`；`scripts/verify-roles.sh` |
+| **S18** | **无治理接口** | trait 无 5 个治理方法；CI grep | ✅ P8 | `tests/no_governance.rs`（3）；`scripts/verify-roles.sh` |
 | **S19** | **自身管理写越权** | 改他人 → `Unauthorized` | ✅ P2 | `tests/role_gate.rs`（10） |
-| **S20** | **business_types 不参与鉴权** | 篡改后行为不变 | ⏳ | `tests/participant_binding.rs` |
+| **S20** | **business_types 不参与鉴权** | 篡改后行为不变 | ✅ P7 | `tests/participant_binding.rs::business_types_do_not_affect_authorization` |
 | S1-static | musl 静态链接 | `file` 断言 static；`ldd` 无动态依赖 | ⏳ CI | `rust-musl.yml` |
 | S2-UserRejected | `UserRejected` 透传 | `KeyVaultError::UserRejected` → `ChainSdkError::UserRejected` | ⏳ | `tests/keyvault_integration.rs` |
 | S3-AppAlias | `role = "app"` 兼容 | 反序列化为 `Issuer` | ✅ P0 | `tests/config_resolution.rs::role_app_alias_maps_to_issuer` |
@@ -136,8 +136,8 @@
 | P4 | 8 | 49 | ✅ capabilities 5 + config 单元 3 |
 | P5 | 9 | 58 | ✅ centralized_contract 6 + centralized_cache 3 |
 | P6 | 6 | 64 | ✅ centralized_signing 5 + canonical 单元 1 |
-| P7 | — | — | ⏳ |
-| P8 | — | — | ⏳ |
+| P7 | 5 | 69 | ✅ participant_binding 5 |
+| P8 | 3 | 72 | ✅ no_governance 3 |
 | P9 | — | — | ⏳ |
 | P10 | — | — | ⏳ |
 | P11 | — | — | ⏳ |
