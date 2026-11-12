@@ -2,12 +2,12 @@
 
 | 项目 | 内容 |
 |---|---|
-| 仓库 | `https://github.com/metercai/chain-sdk`（本地已初始化；远程推送待 D-18） |
+| 仓库 | [`metercai/chain-sdk`](https://github.com/metercai/chain-sdk)（`main` 已推送） |
 | 版本 | `0.1.0` |
 | 工具链 | Rust 1.88.0，edition 2024，`resolver = "3"` |
 | 本地门禁 | `cargo fmt --check`、`cargo clippy -D warnings`、`cargo test` **93 passed** |
 | 依据 | `docs/implementation-plan.md`（D-01～D-20 已批准） |
-| 状态 | **P0–P12 完成；P13 仅剩 GitHub 推送与 CI 结果待用户提供凭据** |
+| 状态 | **P0–P13 完成**：本地 93 测试通过；4 个 GitHub Actions workflow 全绿 |
 
 ---
 
@@ -65,6 +65,15 @@ configs/ scripts/ .github/workflows/ metadata/
 > musl 静态（`x86_64`/`aarch64`）与 Windows/macOS 交叉构建由 GitHub Actions
 > `rust-musl.yml` 执行；本地无 zig/cargo-zigbuild。
 
+### 3.1 GitHub Actions（commit `main` 首推）
+
+| workflow | 结果 | 链接 |
+|---|---|---|
+| `ci`（fmt / clippy / test / 契约） | ✅ success | https://github.com/metercai/chain-sdk/actions/runs/43274367793 |
+| `rust-musl`（4 target，musl 静态断言） | ✅ success | https://github.com/metercai/chain-sdk/actions/runs/43274367936 |
+| `consistency` | ✅ success | https://github.com/metercai/chain-sdk/actions/runs/43274367885 |
+| `roles`（角色矩阵 + S18/S17 grep） | ✅ success | https://github.com/metercai/chain-sdk/actions/runs/43274367598 |
+
 ## 4. 与规格/计划的实施偏差（均已在计划中记录）
 
 1. **MSRV 1.88**（D-01）：did-sdk 与 subxt 的硬要求。
@@ -82,7 +91,7 @@ configs/ scripts/ .github/workflows/ metadata/
 
 | 项 | 依赖 | 影响 |
 |---|---|---|
-| GitHub 推送 / 4 个 workflow 全绿 | 用户提供仓库与 PAT/SSH（D-18） | P13、S1-static、平台矩阵 |
+| ~~GitHub 推送 / 4 个 workflow 全绿~~ | ✅ 已完成（osxkeychain 凭据） | — |
 | Chain storage / extrinsic | identity-chain pallet 元数据与节点 | S2/S3 的 chain 读、真实链验收 |
 | SD-JWT 端到端（I6 / D1–D5） | did-sdk v0.2（`credentialStatus`、`disclosures`、VP 签名输入、未知字段保留） | 持有者存储/出示 |
 | Centralized 服务契约 | Q-01（服务端实现/规格） | 端点与错误码最终对齐 |
@@ -90,8 +99,7 @@ configs/ scripts/ .github/workflows/ metadata/
 
 ## 6. 下一步
 
-1. 用户在 GitHub 创建空仓库 `metercai/chain-sdk` 并配置凭据；
-2. `git push -u origin main`，等待 `ci` / `rust-musl` / `consistency` / `roles` 全绿；
-3. 把 CI 运行链接与结果填入 `docs/acceptance-checklist.md`（A11 / S1-static / 平台矩阵）；
-4. 拿到 identity-chain 元数据后补 Chain storage 查询与真实链集成测试；
-5. 与 did-sdk 排期 v0.2，完成 SD-JWT 端到端闭环。
+1. 拿到 identity-chain pallet 元数据后补 Chain storage 查询与真实链集成测试；
+2. 与 did-sdk 排期 v0.2，完成 SD-JWT 端到端闭环（Disclosures 存储/出示）；
+3. 与中心化模拟链服务对齐附录 C 契约（Q-01）；
+4. 评估 RFC 8785 JCS canonical JSON（Q-03）与 Centralized 重放保护（Q-07）。

@@ -22,7 +22,7 @@
 | 本地 A3 | `cargo test --locked --all-features` | ✅ 93 tests（P0–P12） |
 | 依赖边界 | 无 `openssl` / `native-tls` | ✅ |
 | R1 边界 | `did-sdk` 依赖树无 `subxt` | ✅ 0 处 |
-| GitHub | 仓库创建 + 4 workflow 全绿 | ⏳ 待 D-18 |
+| GitHub | 仓库创建 + 4 workflow 全绿 | ✅ `main` 已推送；4/4 success |
 
 ---
 
@@ -50,7 +50,7 @@
 | **S18** | **无治理接口** | trait 无 5 个治理方法；CI grep | ✅ P8 | `tests/no_governance.rs`（3）；`scripts/verify-roles.sh` |
 | **S19** | **自身管理写越权** | 改他人 → `Unauthorized` | ✅ P2 | `tests/role_gate.rs`（10） |
 | **S20** | **business_types 不参与鉴权** | 篡改后行为不变 | ✅ P7 | `tests/participant_binding.rs::business_types_do_not_affect_authorization` |
-| S1-static | musl 静态链接 | `file` 断言 static；`ldd` 无动态依赖 | ⏳ CI | `rust-musl.yml` |
+| S1-static | musl 静态链接 | `file` 断言 static；`ldd` 无动态依赖 | ✅ CI | [rust-musl run](https://github.com/metercai/chain-sdk/actions/runs/43274367936) |
 | S2-UserRejected | `UserRejected` 透传 | `KeyVaultError::UserRejected` → `ChainSdkError::UserRejected` | ⏳ | `tests/keyvault_integration.rs` |
 | S3-AppAlias | `role = "app"` 兼容 | 反序列化为 `Issuer` | ✅ P0 | `tests/config_resolution.rs::role_app_alias_maps_to_issuer` |
 
@@ -60,11 +60,11 @@
 
 | 编号 | 项 | 通过标准 | 状态 | 证据 |
 |---|---|---|---|---|
-| P1 | `x86_64-unknown-linux-musl` | 完全静态 | ⏳ CI | `rust-musl.yml` |
-| P2 | `aarch64-unknown-linux-musl` | 完全静态 | ⏳ CI | 同上 |
-| P3 | `aarch64-apple-darwin` | 原生构建 | ⏳ CI | 同上 |
-| P4 | `x86_64-pc-windows-msvc` | 原生构建 | ⏳ CI | 同上 |
-| P5 | 产物上传 | `chain-sdk-mini-cli-<target>` artifact | ⏳ CI | 同上 |
+| P1 | `x86_64-unknown-linux-musl` | 完全静态 | ✅ CI | rust-musl run 43274367936 |
+| P2 | `aarch64-unknown-linux-musl` | 完全静态 | ✅ CI | 同上 |
+| P3 | `aarch64-apple-darwin` | 原生构建 | ✅ CI | 同上 |
+| P4 | `x86_64-pc-windows-msvc` | 原生构建 | ✅ CI | 同上 |
+| P5 | 产物上传 | `chain-sdk-mini-cli-<target>` artifact | ✅ CI | 同上 |
 
 ---
 
@@ -117,10 +117,10 @@
 
 | workflow | 触发 | 状态 |
 |---|---|---|
-| `ci.yml` | push / PR / dispatch | ⏳ 待仓库创建 |
-| `rust-musl.yml` | push / PR / dispatch | ⏳ |
-| `consistency.yml` | push / PR / dispatch | ⏳ |
-| `roles.yml` | push / PR / dispatch | ⏳ |
+| `ci.yml` | push / PR / dispatch | ✅ [run 43274367793](https://github.com/metercai/chain-sdk/actions/runs/43274367793) |
+| `rust-musl.yml` | push / PR / dispatch | ✅ [run 43274367936](https://github.com/metercai/chain-sdk/actions/runs/43274367936) |
+| `consistency.yml` | push / PR / dispatch | ✅ [run 43274367885](https://github.com/metercai/chain-sdk/actions/runs/43274367885) |
+| `roles.yml` | push / PR / dispatch | ✅ [run 43274367598](https://github.com/metercai/chain-sdk/actions/runs/43274367598) |
 
 ---
 
@@ -149,7 +149,7 @@
 
 | 项 | 需要 | 影响 |
 |---|---|---|
-| GitHub 仓库 | 用户创建 `metercai/chain-sdk` + PAT/SSH 授权（D-18） | A11、全部 CI |
+| GitHub 仓库 | ✅ 已创建并推送；osxkeychain 凭据可用 | — |
 | 中心化模拟链契约 | Q-01 | S6 / S7 |
 | identity-chain 元数据 / 节点 | Q-02 | Chain 真实链验收（R-01） |
 | did-sdk v0.2 | D-16 | SD-JWT 端到端（I6 / D1–D5） |

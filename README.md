@@ -21,13 +21,17 @@
 >   storage/extrinsic 按 D-06 返回 `Unsupported`）、`mini_cli`、Mock vs Centralized 一致性；
 > - 已完成（P12）：SD-JWT 选择性披露原语（`sd-v1` 盐化哈希、Disclosures、
 >   `SD-VP-v1` 验证、锚定生命周期检查）；端到端交付仍依赖 did-sdk v0.2（D-16）；
-> - 待办（P13）：GitHub 推送与 CI 结果（用户要求先本地评审，D-18）；
+> - 已完成（P13）：GitHub 推送 `main`，`ci` / `rust-musl` / `consistency` / `roles`
+>   四个 workflow 全绿（含 musl 双架构静态断言与 Windows/macOS 构建）；
 > - 本地门禁：93 个测试通过；详见 [`docs/implementation-report.md`](docs/implementation-report.md)；
-> - GitHub 仓库尚未创建（用户选择先本地评审，见实施文档 D-18）。
+> - CI 结果：[`ci`](https://github.com/metercai/chain-sdk/actions/runs/43274367793) ·
+  [`rust-musl`](https://github.com/metercai/chain-sdk/actions/runs/43274367936) ·
+  [`consistency`](https://github.com/metercai/chain-sdk/actions/runs/43274367885) ·
+  [`roles`](https://github.com/metercai/chain-sdk/actions/runs/43274367598)。
 
 | 项目 | 内容 |
 |---|---|
-| 仓库 | `https://github.com/metercai/chain-sdk`（待创建/推送） |
+| 仓库 | [`metercai/chain-sdk`](https://github.com/metercai/chain-sdk)（`main` 已推送，4 个 workflow 全绿） |
 | 语言 | Rust 1.88.0（`edition 2024`，`resolver = "3"`） |
 | 依赖 | `keyvault-core` / `did-sdk` 均为**外部依赖**（`did-sdk` 仓库 `v0.1.0` tag） |
 | 跨平台 | 四目标矩阵，统一由 GitHub Actions runner 编译 |
