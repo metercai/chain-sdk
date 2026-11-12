@@ -8,6 +8,14 @@
 | Audience | Service-side Rust applications (gateways, issuers, verifiers), `chain-owner-sdk`, `did-sdk` maintainers |
 | Normative | This document is the single source of truth for the contract. Any change follows §13. |
 
+## Related Contracts
+
+| Project | Document |
+|---|---|
+| did-sdk | [DidSdk Interface Contract](https://github.com/metercai/did-sdk/blob/main/docs/DidSdk-Interface-Contract.md) |
+| keyvault-core | [KeyVaultCore Interface Contract](https://github.com/metercai/did-sdk/blob/main/docs/KeyVaultCore-Interface-Contract.md) |
+| selective disclosure | [Selective Disclosure Interop](https://github.com/metercai/did-sdk/blob/main/docs/selective-disclosure-interop.md) |
+
 ---
 
 ## 1. Scope

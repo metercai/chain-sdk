@@ -8,6 +8,7 @@
 > - 契约与实现：[`docs/ChainSdk-Interface-Contract.md`](docs/ChainSdk-Interface-Contract.md)（唯一规范文档）
 > - 本地门禁：96 个测试通过；`cargo fmt --check`、`cargo clippy -D warnings` 干净
 > - CI：`ci` / `rust-musl` / `consistency` / `roles` 四个 workflow 全绿
+> - did-sdk contract: [DidSdk Interface Contract](https://github.com/metercai/did-sdk/blob/main/docs/DidSdk-Interface-Contract.md)
 > - 依赖：`did-sdk` / `keyvault-core` 固定 **v0.2.0**；选择性披露与 did-sdk 的
 >   `Disclosure` / `verify_vp` / `VP-SD-v1` 对齐
 
@@ -243,7 +244,7 @@ chain-sdk/
 
 ---
 
-## 10. VC 选择性披露（盐化哈希，非 JWT）
+## 10. VC 选择性披露（盐化哈希）
 
 选择性披露在**不修改链上锚定原语**的前提下实现：链上仍然只存 VC 整体哈希。
 
