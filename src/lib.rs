@@ -31,7 +31,7 @@
 //! # 实现状态
 //!
 //! 本提交是**初始化骨架**：公开契约已冻结，后端实现与测试按
-//! `docs/ChainSdk接口契约与实现规格书.md`。
+//! `docs/ChainSdk-Interface-Contract.md`。
 
 pub mod centralized;
 pub mod chain;

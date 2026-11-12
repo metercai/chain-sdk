@@ -5,7 +5,7 @@
 
 > **当前状态：v0.1.0 初始版本，已完成实现并通过 CI。**
 >
-> - 契约与实现：[`docs/ChainSdk接口契约与实现规格书.md`](docs/ChainSdk接口契约与实现规格书.md)（唯一规范文档）
+> - 契约与实现：[`docs/ChainSdk-Interface-Contract.md`](docs/ChainSdk-Interface-Contract.md)（唯一规范文档）
 > - 本地门禁：96 个测试通过；`cargo fmt --check`、`cargo clippy -D warnings` 干净
 > - CI：`ci` / `rust-musl` / `consistency` / `roles` 四个 workflow 全绿
 > - 依赖：`did-sdk` / `keyvault-core` 固定 **v0.2.0**；SD-JWT 与 did-sdk 的
@@ -238,7 +238,7 @@ chain-sdk/
 ├── .github/workflows/{ci,rust-musl,consistency,roles}.yml
 ├── metadata/README.md    # 为何不提交 identity_chain.scale
 └── docs/
-    └── ChainSdk接口契约与实现规格书.md   # 唯一规范文档（英文）
+    └── ChainSdk-Interface-Contract.md   # 唯一规范文档（英文）
 ```
 
 ---
@@ -280,7 +280,7 @@ chain-sdk/
 
 | 文档 | 说明 |
 |---|---|
-| [`docs/ChainSdk接口契约与实现规格书.md`](docs/ChainSdk接口契约与实现规格书.md) | **唯一规范文档**：契约、后端、SD-JWT、配置、验收、状态 |
+| [`docs/ChainSdk-Interface-Contract.md`](docs/ChainSdk-Interface-Contract.md) | **唯一规范文档**：契约、后端、SD-JWT、配置、验收、状态 |
 
 ## 13. 未来扩展
 

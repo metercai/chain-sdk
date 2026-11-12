@@ -6,7 +6,7 @@
 //!
 //! TOML 使用嵌套段（`[chain_sdk.key_vault]`、`[chain_sdk.centralized]` 等），
 //! 由内部 `FileConfig` 映射到扁平的 [`ChainSdkConfig`]。完整算法见
-//! `docs/ChainSdk接口契约与实现规格书.md` §8。
+//! `docs/ChainSdk-Interface-Contract.md` §8。
 
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -663,7 +663,7 @@ fn apply_overrides(config: &mut ChainSdkConfig, overrides: ConfigOverrides) {
 
 /// 解析配置。
 ///
-/// 完整算法见 `docs/ChainSdk接口契约与实现规格书.md` §8。Issuer 在
+/// 完整算法见 `docs/ChainSdk-Interface-Contract.md` §8。Issuer 在
 /// `scheme = "file-keystore"` 时会解析密码；`memory-keystore` 不需要密码。
 pub fn resolve_config(overrides: ConfigOverrides) -> Result<ChainSdkConfig, ChainSdkError> {
     // 先校验 override 中的枚举值，避免被 apply_overrides 静默忽略。

@@ -1,6 +1,6 @@
 //! VC selective disclosure (SD-JWT) on top of `did-sdk` v0.2.
 //!
-//! Contract (see `docs/ChainSdk接口契约与实现规格书.md`):
+//! Contract (see `docs/ChainSdk-Interface-Contract.md`):
 //!
 //! - **Hashing (sd-v1)**: `SHA-256( salt || b64url(name) || b64url(value) )`,
 //!   `_sd[i] = b64url_nopad(hash)`. This is the same formula used by

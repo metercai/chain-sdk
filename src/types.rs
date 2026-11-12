@@ -1,6 +1,6 @@
 //! 链上数据模型：参与方、锚定、DID、签名与健康状态。
 //!
-//! 字段命名与 `docs/ChainSdk接口契约与实现规格书.md` §3.3 完全一致；
+//! 字段命名与 `docs/ChainSdk-Interface-Contract.md` §3.3 完全一致；
 //! JSON 序列化使用 snake_case 字段名（与中心化模拟链服务契约一致）。
 
 use serde::{Deserialize, Serialize};
