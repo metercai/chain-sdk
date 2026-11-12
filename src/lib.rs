@@ -33,6 +33,7 @@
 //! 本提交是**初始化骨架**：公开契约已冻结，后端实现与测试按
 //! `docs/implementation-plan.md` 分阶段进行（P0–P12），评审通过后开始实现。
 
+pub mod centralized;
 pub mod config;
 mod did_adapter;
 pub mod error;
@@ -48,6 +49,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+pub use centralized::CentralizedChainSdk;
 pub use config::{
     Capabilities, ChainSdkConfig, ChainSdkMode, ConfigOverrides, DidConfig, KeyVaultConfig,
     KeyVaultKeys, MockConfig, ParticipantConfig, SdkRole, build_chain_sdk, build_mock_chain_sdk,

@@ -815,9 +815,10 @@ pub fn build_chain_sdk(config: &ChainSdkConfig) -> Result<Arc<dyn ChainSdk>, Cha
     let core = assemble_core(config)?;
     match core.config.mode {
         ChainSdkMode::Mock => Ok(Arc::new(crate::mock::MockChainSdk::from_core(core)?)),
-        ChainSdkMode::Centralized | ChainSdkMode::Chain => {
-            Ok(Arc::new(crate::placeholder::PlaceholderChainSdk::new(core)))
-        }
+        ChainSdkMode::Centralized => Ok(Arc::new(crate::centralized::CentralizedChainSdk::new(
+            core,
+        )?)),
+        ChainSdkMode::Chain => Ok(Arc::new(crate::placeholder::PlaceholderChainSdk::new(core))),
     }
 }
 
@@ -827,6 +828,16 @@ pub fn build_mock_chain_sdk(
 ) -> Result<Arc<crate::mock::MockChainSdk>, ChainSdkError> {
     let core = assemble_core(config)?;
     Ok(Arc::new(crate::mock::MockChainSdk::from_core(core)?))
+}
+
+/// 构造具体的 Centralized 后端（测试需要具体类型时使用）。
+pub fn build_centralized_chain_sdk(
+    config: &ChainSdkConfig,
+) -> Result<Arc<crate::centralized::CentralizedChainSdk>, ChainSdkError> {
+    let core = assemble_core(config)?;
+    Ok(Arc::new(crate::centralized::CentralizedChainSdk::new(
+        core,
+    )?))
 }
 
 /// 用调用方提供的状态构造 Mock 后端（fixtures / 测试）。

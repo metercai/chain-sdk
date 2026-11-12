@@ -157,6 +157,23 @@ impl AnchorType {
     pub fn is_custom(&self) -> bool {
         matches!(self, Self::Custom(_))
     }
+
+    /// 稳定的字符串表示（用于 HTTP 查询参数与日志）。
+    ///
+    /// 已知变体返回变体名；`Custom(name)` 返回内部名称。
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::EmailBinding => "EmailBinding",
+            Self::DomainControl => "DomainControl",
+            Self::DidDocument => "DidDocument",
+            Self::Warrant => "Warrant",
+            Self::Delegation => "Delegation",
+            Self::OrgMembership => "OrgMembership",
+            Self::IssuedVc => "IssuedVc",
+            Self::GatewayAccess => "GatewayAccess",
+            Self::Custom(name) => name,
+        }
+    }
 }
 
 /// 参加方断言签名的用途（域分离标签）。

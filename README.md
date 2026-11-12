@@ -12,8 +12,10 @@
 >   双向索引、JSON 持久化、故障注入，以及 S9/S19 越权拦截；
 > - 已完成（P3–P4）：`did_adapter` 按角色装配 did-sdk（两角色均有 did-resolution，
 >   仅 Issuer 加载 KeyVault 与两类密钥）；`did:key` 离线解析、`did:web` 委派 did-sdk；
-> - 进行中（P5）：`Centralized` 只读后端与 TTL 缓存；
-> - 本地门禁：49 个测试通过（配置 10、namespace 7、Mock 8、角色 10、能力 5、单元 9）；
+> - 已完成（P5–P6）：`Centralized` 后端——HTTP 只读、`get_anchor` TTL 缓存、
+>   写请求签名（`op || "\n" || canonical JSON`）与 `x-chain-*` 头；
+> - 进行中（P7）：参与方身份绑定与委托锚定 fixtures；
+> - 本地门禁：64 个测试通过；
 > - GitHub 仓库尚未创建（用户选择先本地评审，见实施文档 D-18）。
 
 | 项目 | 内容 |

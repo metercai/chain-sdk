@@ -19,7 +19,7 @@
 | 本地 A1 | `cargo check --locked --all-targets --all-features` | ✅ 通过（44.7s） |
 | 本地 A2 | `cargo fmt --all -- --check` | ✅ 通过 |
 | 本地 A2 | `cargo clippy --locked --all-targets --all-features -- -D warnings` | ✅ 零告警 |
-| 本地 A3 | `cargo test --locked --all-features` | ✅ 49 tests（P0–P4） |
+| 本地 A3 | `cargo test --locked --all-features` | ✅ 64 tests（P0–P6） |
 | 依赖边界 | 无 `openssl` / `native-tls` | ✅ |
 | R1 边界 | `did-sdk` 依赖树无 `subxt` | ✅ 0 处 |
 | GitHub | 仓库创建 + 4 workflow 全绿 | ⏳ 待 D-18 |
@@ -35,9 +35,9 @@
 | S3 | 三后端语义一致 | 同一操作结果与错误码一致 | ⏳ | `tests/consistency.rs` |
 | S4 | Mock 状态预置与持久化 | 预置可读；写后 JSON 更新；重启仍在 | ✅ P1/P2 | `tests/mock_persistence.rs`（4）+ `tests/role_gate.rs::writes_are_persisted` |
 | S5 | Mock 故障注入 | 延迟 / 不可用 / 指定错误 | ✅ P1 | `tests/mock_fault_injection.rs`（4） |
-| S6 | Centralized 接口映射 | method + path + 查询参数正确 | ⏳ | `tests/centralized_contract.rs` |
-| S7 | Centralized 写签名 | `x-chain-*` 三头；签名可验 | ⏳ | `tests/centralized_signing.rs` |
-| S8 | Centralized 缓存 | TTL 命中 + 过期穿透 + 关闭 | ⏳ | `tests/centralized_cache.rs` |
+| S6 | Centralized 接口映射 | method + path + 查询参数正确 | ✅ P5 | `tests/centralized_contract.rs`（6） |
+| S7 | Centralized 写签名 | `x-chain-*` 三头；签名可验 | ✅ P6 | `tests/centralized_signing.rs`（5） |
+| S8 | Centralized 缓存 | TTL 命中 + 过期穿透 + 关闭 | ✅ P5 | `tests/centralized_cache.rs`（3） |
 | S9 | Chain 角色拦截 | Verifier 写 → `Unauthorized`；断言 → `SignerUnavailable` | ✅ P2（Mock） | `tests/role_gate.rs::verifier_cannot_write_any_backend` |
 | S10 | 私钥管理内置 | FileKeystore 可用；密码链正确 | 🟡 FileKeystore 签名已通过；完整密码链待 P4 | `tests/keys_namespace.rs::issuer_signs_with_file_keystore` |
 | S11 | 事件订阅 | 三后端均能收到事件；取消幂等 | ⏳ | `tests/event_subscription.rs` |
@@ -134,8 +134,8 @@
 | P2 | 10 | 41 | ✅ role_gate 10 |
 | P3 | 0（并入 P0） | 41 | ✅ S14 已通过 |
 | P4 | 8 | 49 | ✅ capabilities 5 + config 单元 3 |
-| P5 | — | — | ⏳ |
-| P6 | — | — | ⏳ |
+| P5 | 9 | 58 | ✅ centralized_contract 6 + centralized_cache 3 |
+| P6 | 6 | 64 | ✅ centralized_signing 5 + canonical 单元 1 |
 | P7 | — | — | ⏳ |
 | P8 | — | — | ⏳ |
 | P9 | — | — | ⏳ |
