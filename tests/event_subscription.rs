@@ -7,6 +7,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use chain_sdk::config::build_chain_sdk;
 use chain_sdk::config::{
     ChainSdkConfig, ChainSdkMode, DidConfig, KeyVaultConfig, ParticipantConfig, SdkRole,
     build_centralized_chain_sdk, build_mock_chain_sdk_with_state,
@@ -168,4 +169,26 @@ async fn centralized_events_are_delivered_over_websocket() {
     assert_eq!(events[0].event_name, "AnchorCreated");
     assert_eq!(events[0].anchor_id.as_deref(), Some("a1"));
     assert_eq!(events[0].block_number, Some(9));
+}
+
+#[tokio::test]
+async fn chain_subscription_registers_without_node() {
+    let config = ChainSdkConfig {
+        mode: ChainSdkMode::Chain,
+        role: SdkRole::Verifier,
+        participant: ParticipantConfig {
+            controller_did: "did:web:verifier.example.com".into(),
+        },
+        did: DidConfig {
+            vc_storage_path: temp_vc_path(),
+        },
+        chain_endpoint: "ws://127.0.0.1:1".into(),
+        ..Default::default()
+    };
+    let sdk = build_chain_sdk(&config).unwrap();
+    // 订阅注册是同步的；连接失败在后台重试，不影响注册。
+    let unsubscribe = sdk
+        .subscribe_event("AnchorCreated", Box::new(|_event| {}))
+        .unwrap();
+    unsubscribe();
 }

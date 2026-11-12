@@ -34,6 +34,7 @@
 //! `docs/implementation-plan.md` 分阶段进行（P0–P12），评审通过后开始实现。
 
 pub mod centralized;
+pub mod chain;
 pub mod config;
 mod did_adapter;
 pub mod error;
@@ -42,7 +43,6 @@ pub mod keys;
 pub mod mock;
 pub mod types;
 
-mod placeholder;
 mod role_gate;
 
 use std::sync::Arc;
@@ -50,6 +50,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 pub use centralized::CentralizedChainSdk;
+pub use chain::ChainModeSdk;
 pub use config::{
     Capabilities, ChainSdkConfig, ChainSdkMode, ConfigOverrides, DidConfig, KeyVaultConfig,
     KeyVaultKeys, MockConfig, ParticipantConfig, SdkRole, build_chain_sdk, build_mock_chain_sdk,

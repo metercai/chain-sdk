@@ -19,7 +19,7 @@
 | 本地 A1 | `cargo check --locked --all-targets --all-features` | ✅ 通过（44.7s） |
 | 本地 A2 | `cargo fmt --all -- --check` | ✅ 通过 |
 | 本地 A2 | `cargo clippy --locked --all-targets --all-features -- -D warnings` | ✅ 零告警 |
-| 本地 A3 | `cargo test --locked --all-features` | ✅ 77 tests（P0–P9） |
+| 本地 A3 | `cargo test --locked --all-features` | ✅ 84 tests（P0–P11） |
 | 依赖边界 | 无 `openssl` / `native-tls` | ✅ |
 | R1 边界 | `did-sdk` 依赖树无 `subxt` | ✅ 0 处 |
 | GitHub | 仓库创建 + 4 workflow 全绿 | ⏳ 待 D-18 |
@@ -31,17 +31,17 @@
 | 编号 | 验收项 | 通过标准 | 状态 | 证据 |
 |---|---|---|---|---|
 | S1 | 接口契约完整 | `ChainSdk` 16 方法齐备；`cargo check` | ⏳ 待实施 | `src/lib.rs`；CI 契约步骤 |
-| S2 | 三后端模式切换 | `mock`/`centralized`/`chain` 经 `mode` 切换，需重启 | 🟡 配置解析通过；后端待 P1/P5/P10 | `tests/config_resolution.rs`（10 用例） |
-| S3 | 三后端语义一致 | 同一操作结果与错误码一致 | ⏳ | `tests/consistency.rs` |
+| S2 | 三后端模式切换 | `mock`/`centralized`/`chain` 经 `mode` 切换，需重启 | ✅ P10 | `tests/config_resolution.rs`（10）+ `tests/role_matrix.rs`（4） |
+| S3 | 三后端语义一致 | 同一操作结果与错误码一致 | ✅ P11（Mock vs Centralized；Chain 读为 `Unsupported`，按 D-06） | `tests/consistency.rs`（2） |
 | S4 | Mock 状态预置与持久化 | 预置可读；写后 JSON 更新；重启仍在 | ✅ P1/P2 | `tests/mock_persistence.rs`（4）+ `tests/role_gate.rs::writes_are_persisted` |
 | S5 | Mock 故障注入 | 延迟 / 不可用 / 指定错误 | ✅ P1 | `tests/mock_fault_injection.rs`（4） |
 | S6 | Centralized 接口映射 | method + path + 查询参数正确 | ✅ P5 | `tests/centralized_contract.rs`（6） |
 | S7 | Centralized 写签名 | `x-chain-*` 三头；签名可验 | ✅ P6 | `tests/centralized_signing.rs`（5） |
 | S8 | Centralized 缓存 | TTL 命中 + 过期穿透 + 关闭 | ✅ P5 | `tests/centralized_cache.rs`（3） |
-| S9 | Chain 角色拦截 | Verifier 写 → `Unauthorized`；断言 → `SignerUnavailable` | ✅ P2（Mock） | `tests/role_gate.rs::verifier_cannot_write_any_backend` |
+| S9 | Chain 角色拦截 | Verifier 写 → `Unauthorized`；断言 → `SignerUnavailable` | ✅ P2/P10（三后端） | `tests/role_gate.rs` + `tests/role_matrix.rs` |
 | S10 | 私钥管理内置 | FileKeystore 可用；密码链正确 | 🟡 FileKeystore 签名已通过；完整密码链待 P4 | `tests/keys_namespace.rs::issuer_signs_with_file_keystore` |
-| S11 | 事件订阅 | 三后端均能收到事件；取消幂等 | 🟡 Mock + Centralized 通过；Chain 待 P10 | `tests/event_subscription.rs`（3）+ events 单元（2） |
-| S12 | 一致性测试 | Mock vs Centralized 同结果 | ⏳ | `tests/consistency.rs` |
+| S11 | 事件订阅 | 三后端均能收到事件；取消幂等 | ✅ P9/P10 | `tests/event_subscription.rs`（4）+ events 单元（2）；Chain 真实节点需集成环境 |
+| S12 | 一致性测试 | Mock vs Centralized 同结果 | ✅ P11 | `tests/consistency.rs`（2） |
 | S13 | `keyvault-core` 集成 | `UserRejected` / namespace 错误映射 | ⏳ | `tests/keyvault_integration.rs` |
 | **S14** | **namespace 隔离** | 错误前缀 → `KeyNamespaceViolation` | ✅ P0 | `cargo test --test keys_namespace`（7 用例） |
 | **S15** | **参与方身份绑定** | DID ↔ id ↔ operator 双向索引 | ✅ P7 | `tests/participant_binding.rs`（5） |
@@ -139,8 +139,8 @@
 | P7 | 5 | 69 | ✅ participant_binding 5 |
 | P8 | 3 | 72 | ✅ no_governance 3 |
 | P9 | 5 | 77 | ✅ event_subscription 3 + events 单元 2 |
-| P10 | — | — | ⏳ |
-| P11 | — | — | ⏳ |
+| P10 | 5 | 82 | ✅ role_matrix 4 + chain 订阅 1 |
+| P11 | 2 | 84 | ✅ consistency 2 |
 | P12（可选） | — | — | ⏳ |
 
 ---

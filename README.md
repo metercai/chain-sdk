@@ -16,9 +16,11 @@
 >   写请求签名（`op || "\n" || canonical JSON`）与 `x-chain-*` 头；
 > - 已完成（P7–P8）：参与方三段式绑定、委托锚定 fixtures、`business_types`
 >   不参与鉴权、无治理接口与无 VC 存储方法检查；
-> - 已完成（P9）：Mock 内存事件与 Centralized WebSocket 事件（Chain 在 P10 接入）；
-> - 进行中（P10）：Chain 后端（subxt 连接/健康检查/事件 + 角色拦截）；
-> - 本地门禁：77 个测试通过；
+> - 已完成（P9）：三后端事件订阅（Mock 内存、Centralized WebSocket、Chain subxt）；
+> - 已完成（P10–P11）：Chain 后端（连接/健康检查/finalized 事件 + 角色拦截；
+>   storage/extrinsic 按 D-06 返回 `Unsupported`）、`mini_cli`、Mock vs Centralized 一致性；
+> - 进行中（P12）：SD-JWT 选择性披露原语（按 D-13～D-16 决策）；
+> - 本地门禁：84 个测试通过；
 > - GitHub 仓库尚未创建（用户选择先本地评审，见实施文档 D-18）。
 
 | 项目 | 内容 |
