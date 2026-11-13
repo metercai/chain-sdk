@@ -20,7 +20,6 @@ use async_trait::async_trait;
 use keyvault_core::signing_input::{issued_vc_v1, vp_sd_v1};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use sha2::{Digest, Sha256};
 
 use crate::did_adapter::DidPort;
 use crate::types::AnchorType;
@@ -112,15 +111,6 @@ pub fn disclosure_digest(disclosure: &SdDisclosure) -> Result<String, ChainSdkEr
         .map_err(crate::did_adapter::map_did_err)
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
-    hex::encode(Sha256::digest(bytes))
-}
-
-fn compact<T: Serialize>(value: &T) -> Result<Vec<u8>, ChainSdkError> {
-    serde_json::to_vec(value)
-        .map_err(|error| ChainSdkError::InvalidArgument(format!("compact JSON: {error}")))
-}
-
 /// `payload_hash` for anchoring: VC without `proof` and `anchor_id`.
 ///
 /// Delegates to `did_sdk::anchor_payload_hash` so the two SDKs cannot drift.
@@ -160,7 +150,8 @@ pub fn vp_signing_input(
     credentials: &[did_sdk::VerifiableCredential],
     disclosures: &[SdDisclosure],
 ) -> Result<Vec<u8>, ChainSdkError> {
-    let disclosures_hash = sha256_hex(&compact(&disclosures.to_vec())?);
+    let disclosures_hash =
+        did_sdk::sd::disclosures_hash(disclosures).map_err(crate::did_adapter::map_did_err)?;
     let mut vc_hashes = Vec::with_capacity(credentials.len());
     for credential in credentials {
         vc_hashes.push(did_sdk::vc_hash(credential).map_err(crate::did_adapter::map_did_err)?);

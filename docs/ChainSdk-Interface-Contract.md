@@ -582,7 +582,8 @@ VP-SD-v1
 {vc_hash_n}
 ```
 
-- `disclosures_hash` = hex(SHA-256(compact JSON array of disclosures));
+- `disclosures_hash` = hex(SHA-256(compact JSON array of disclosures)); delegated to
+  `did_sdk::sd::disclosures_hash`;
 - `vc_hash_i` = hex(BLAKE2b-256(compact full VC JSON, including proof)).
 
 Unselected disclosures are not sent. `_sd` in the VC still contains their hashes.
