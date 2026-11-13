@@ -1,6 +1,6 @@
 [package]
 name = "chain-sdk"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.88"
 license = "Apache-2.0"
@@ -17,7 +17,7 @@ members = ["."]
 default-members = ["."]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.88"
 license = "Apache-2.0"
@@ -26,8 +26,8 @@ repository = "https://github.com/metercai/chain-sdk"
 [workspace.dependencies]
 # 外部依赖：由 did-sdk 仓库发布；pin tag 保证可重现构建。
 # 本地联调可临时加 [patch] 指向 ../did-sdk（不提交）。
-keyvault-core = { git = "https://github.com/metercai/did-sdk", tag = "v0.2.0", package = "keyvault-core" }
-did-sdk = { git = "https://github.com/metercai/did-sdk", tag = "v0.2.0" }
+keyvault-core = { git = "https://github.com/metercai/did-sdk", tag = "v0.2.1", package = "keyvault-core" }
+did-sdk = { git = "https://github.com/metercai/did-sdk", tag = "v0.2.1" }
 
 async-trait = "0.1.91"
 async-lock = "3"

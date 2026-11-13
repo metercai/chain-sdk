@@ -1,6 +1,6 @@
 //! 统一错误类型与 `keyvault-core` 错误映射。
 //!
-//! **映射必须唯一**：所有后端只通过 [`map_vault_err`] 把
+//! **映射必须唯一**：所有后端只通过 `map_vault_err` 把
 //! `keyvault_core::KeyVaultError` 转成 [`ChainSdkError`]，不得各自 `match`。
 
 use crate::types::AnchorType;

@@ -178,8 +178,12 @@ async fn create_anchor_signs_canonical_request() {
 
     let body: Value = serde_json::from_slice(&request.body).unwrap();
     let canonical = canonical(&body);
-    // 发出的 body 本身就是 canonical JSON。
+    // 发出的 body 本身就是 canonical JSON；公开函数与测试实现一致。
     assert_eq!(request.body, canonical.as_bytes());
+    assert_eq!(
+        chain_sdk::canonical_json(&body).unwrap(),
+        canonical.as_bytes()
+    );
 
     let payload = format!("create_anchor\n{canonical}");
     assert!(

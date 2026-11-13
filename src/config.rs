@@ -725,7 +725,13 @@ fn resolve_keyvault_password(config: &KeyVaultConfig) -> Result<SecretString, Ch
     )))
 }
 
-fn build_vault(config: &ChainSdkConfig) -> Result<Arc<dyn KeyVault>, ChainSdkError> {
+/// Open or construct the `KeyVault` described by the configuration.
+///
+/// `Issuer` with `file-keystore` requires an already-resolved password
+/// (`resolve_config` does this). `memory-keystore` returns a fresh empty vault.
+/// Hosts can call this before building an SDK and inject the same vault via
+/// [`build_chain_sdk_with_vault`].
+pub fn build_key_vault(config: &ChainSdkConfig) -> Result<Arc<dyn KeyVault>, ChainSdkError> {
     match config.key_vault.scheme.as_str() {
         "file-keystore" => {
             let password = config.resolved_password.clone().ok_or_else(|| {
@@ -776,13 +782,30 @@ fn validate_for_build(config: &ChainSdkConfig) -> Result<(), ChainSdkError> {
 /// - Issuer 加载 `KeyVault` 与两类密钥（前缀校验，S14）；
 /// - Verifier 不加载 `KeyVault`（S17）。
 fn assemble_core(config: &ChainSdkConfig) -> Result<SdkCore, ChainSdkError> {
+    assemble_core_with_vault(config, None)
+}
+
+fn assemble_core_with_vault(
+    config: &ChainSdkConfig,
+    injected: Option<Arc<dyn KeyVault>>,
+) -> Result<SdkCore, ChainSdkError> {
     let mut config = config.clone();
     config.capabilities = config.capabilities.effective_for(config.role);
     validate_for_build(&config)?;
 
-    let vault = match config.role {
-        SdkRole::Issuer => Some(build_vault(&config)?),
-        SdkRole::Verifier => None,
+    let vault = match injected {
+        Some(vault) => {
+            if config.role != SdkRole::Issuer {
+                return Err(ChainSdkError::ConfigError(
+                    "vault injection requires role issuer".into(),
+                ));
+            }
+            Some(vault)
+        }
+        None => match config.role {
+            SdkRole::Issuer => Some(build_key_vault(&config)?),
+            SdkRole::Verifier => None,
+        },
     };
     let keys = match (&vault, config.role) {
         (Some(vault), SdkRole::Issuer) => Some(crate::keys::load_keys(
@@ -807,12 +830,23 @@ fn assemble_core(config: &ChainSdkConfig) -> Result<SdkCore, ChainSdkError> {
 
 /// 按配置构造 `Arc<dyn ChainSdk>`。
 ///
-/// - `Mock`：返回 [`crate::MockChainSdk`]（读、持久化、故障注入；写操作按 P2 推进）；
-/// - `Centralized` / `Chain`：当前返回占位实现（P5 / P10 替换）。
-///
 /// Issuer 会加载 `KeyVault` 与两类密钥；Verifier 不加载 `KeyVault`（S17）。
 pub fn build_chain_sdk(config: &ChainSdkConfig) -> Result<Arc<dyn ChainSdk>, ChainSdkError> {
-    let core = assemble_core(config)?;
+    backend_from_core(assemble_core(config)?)
+}
+
+/// Build a `ChainSdk` using a caller-provided `KeyVault`.
+///
+/// The vault is used as-is; this function never opens a second keystore.
+/// `role` must be `Issuer` (otherwise `ConfigError`).
+pub fn build_chain_sdk_with_vault(
+    config: &ChainSdkConfig,
+    vault: Arc<dyn KeyVault>,
+) -> Result<Arc<dyn ChainSdk>, ChainSdkError> {
+    backend_from_core(assemble_core_with_vault(config, Some(vault))?)
+}
+
+fn backend_from_core(core: SdkCore) -> Result<Arc<dyn ChainSdk>, ChainSdkError> {
     match core.config.mode {
         ChainSdkMode::Mock => Ok(Arc::new(crate::mock::MockChainSdk::from_core(core)?)),
         ChainSdkMode::Centralized => Ok(Arc::new(crate::centralized::CentralizedChainSdk::new(
@@ -830,11 +864,63 @@ pub fn build_mock_chain_sdk(
     Ok(Arc::new(crate::mock::MockChainSdk::from_core(core)?))
 }
 
+/// Mock backend with an injected vault.
+pub fn build_mock_chain_sdk_with_vault(
+    config: &ChainSdkConfig,
+    vault: Arc<dyn KeyVault>,
+) -> Result<Arc<crate::mock::MockChainSdk>, ChainSdkError> {
+    let core = assemble_core_with_vault(config, Some(vault))?;
+    Ok(Arc::new(crate::mock::MockChainSdk::from_core(core)?))
+}
+
+/// Construct a Mock backend sharing a [`crate::mock::MockStateHandle`].
+pub fn build_mock_chain_sdk_with_state_handle(
+    config: &ChainSdkConfig,
+    state: crate::mock::MockStateHandle,
+) -> Result<Arc<crate::mock::MockChainSdk>, ChainSdkError> {
+    let core = assemble_core(config)?;
+    Ok(Arc::new(crate::mock::MockChainSdk::with_state_handle(
+        core, state,
+    )))
+}
+
+/// Construct a Mock backend sharing both a state handle and a vault.
+pub fn build_mock_chain_sdk_with_state_handle_and_vault(
+    config: &ChainSdkConfig,
+    state: crate::mock::MockStateHandle,
+    vault: Arc<dyn KeyVault>,
+) -> Result<Arc<crate::mock::MockChainSdk>, ChainSdkError> {
+    let core = assemble_core_with_vault(config, Some(vault))?;
+    Ok(Arc::new(crate::mock::MockChainSdk::with_state_handle(
+        core, state,
+    )))
+}
+
 /// 构造具体的 Chain 后端（测试需要具体类型时使用）。
 pub fn build_chain_mode_sdk(
     config: &ChainSdkConfig,
 ) -> Result<Arc<crate::chain::ChainModeSdk>, ChainSdkError> {
     let core = assemble_core(config)?;
+    Ok(Arc::new(crate::chain::ChainModeSdk::new(core)))
+}
+
+/// Centralized backend with an injected vault.
+pub fn build_centralized_chain_sdk_with_vault(
+    config: &ChainSdkConfig,
+    vault: Arc<dyn KeyVault>,
+) -> Result<Arc<crate::centralized::CentralizedChainSdk>, ChainSdkError> {
+    let core = assemble_core_with_vault(config, Some(vault))?;
+    Ok(Arc::new(crate::centralized::CentralizedChainSdk::new(
+        core,
+    )?))
+}
+
+/// Chain backend with an injected vault.
+pub fn build_chain_mode_sdk_with_vault(
+    config: &ChainSdkConfig,
+    vault: Arc<dyn KeyVault>,
+) -> Result<Arc<crate::chain::ChainModeSdk>, ChainSdkError> {
+    let core = assemble_core_with_vault(config, Some(vault))?;
     Ok(Arc::new(crate::chain::ChainModeSdk::new(core)))
 }
 

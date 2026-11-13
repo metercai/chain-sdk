@@ -7,6 +7,7 @@
 //! - **事件**：P9 落地。
 
 use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -96,10 +97,47 @@ enum FailureOutcome {
     Latency(u64),
 }
 
+/// Shared handle to a [`MockState`].
+///
+/// Cloning the handle shares the same underlying state; this lets a host (for
+/// example `chain-owner-sdk`) perform governance writes that are immediately
+/// visible to the wrapped `ChainSdk` instance.
+#[derive(Clone)]
+pub struct MockStateHandle(Arc<RwLock<MockState>>);
+
+impl MockStateHandle {
+    /// Create a new handle from an initial state.
+    pub fn new(state: MockState) -> Self {
+        Self(Arc::new(RwLock::new(state)))
+    }
+
+    /// Clone a snapshot for read-only use.
+    pub async fn snapshot(&self) -> MockState {
+        self.0.read().await.clone()
+    }
+
+    /// Atomically mutate the shared state.
+    ///
+    /// The closure is synchronous and must not hold the lock across `.await`;
+    /// the write lock is released when the closure returns.
+    pub async fn update<R>(&self, f: impl FnOnce(&mut MockState) -> R) -> R {
+        let mut guard = self.0.write().await;
+        f(&mut guard)
+    }
+}
+
+impl Deref for MockStateHandle {
+    type Target = RwLock<MockState>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// Mock 后端。
 pub struct MockChainSdk {
     core: SdkCore,
-    state: RwLock<MockState>,
+    state: MockStateHandle,
     failures: RwLock<Vec<FailureRule>>,
     unavailable: AtomicBool,
     persistence_path: Option<PathBuf>,
@@ -125,19 +163,28 @@ impl MockChainSdk {
     }
 
     pub(crate) fn with_state(core: SdkCore, state: MockState) -> Self {
+        Self::with_state_handle(core, MockStateHandle::new(state))
+    }
+
+    pub(crate) fn with_state_handle(core: SdkCore, state: MockStateHandle) -> Self {
         Self {
             persistence_path: core.config.mock.state_path.clone(),
             core,
-            state: RwLock::new(state),
+            state,
             failures: RwLock::new(Vec::new()),
             unavailable: AtomicBool::new(false),
             subscribers: Arc::new(SubscriptionTable::new()),
         }
     }
 
+    /// Shared state handle (multiple calls return the same underlying state).
+    pub fn state_handle(&self) -> MockStateHandle {
+        self.state.clone()
+    }
+
     /// 当前状态快照（测试与诊断用）。
     pub async fn snapshot(&self) -> MockState {
-        self.state.read().await.clone()
+        self.state.snapshot().await
     }
 
     /// 推进 Mock 内部时间并持久化。
@@ -159,7 +206,11 @@ impl MockChainSdk {
         self.unavailable.store(unavailable, Ordering::SeqCst);
     }
 
-    async fn persist(&self) -> Result<(), ChainSdkError> {
+    /// Persist the current shared state to `mock.state_path` (if configured).
+    ///
+    /// External governance writes performed through [`MockStateHandle::update`]
+    /// do not emit events; callers must invoke this method to persist them.
+    pub async fn persist(&self) -> Result<(), ChainSdkError> {
         let Some(path) = &self.persistence_path else {
             return Ok(());
         };

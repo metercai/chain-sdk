@@ -1,0 +1,38 @@
+{
+  "description": "Centralized write-signature vectors. Test-only key; do not reuse.",
+  "public_key_hex": "3a40a9316ca363dc33cc5280718ed9295f005ee6931aa14c259f7bbcdca63939",
+  "signer": "chain-account/5DP5qqMLMCEHe6khtV6ZtStMpfBxjNen2CvQ2w8JjNyhcvHF",
+  "vectors": [
+    {
+      "body": {
+        "anchor_type": {
+          "kind": "EmailBinding"
+        },
+        "payload_hash": "blake2b:deadbeef",
+        "valid_until": 0
+      },
+      "canonical": "{\"anchor_type\":{\"kind\":\"EmailBinding\"},\"payload_hash\":\"blake2b:deadbeef\",\"valid_until\":0}",
+      "op": "create_anchor",
+      "payload": "create_anchor\n{\"anchor_type\":{\"kind\":\"EmailBinding\"},\"payload_hash\":\"blake2b:deadbeef\",\"valid_until\":0}",
+      "signature_hex": "6261ef234889a60c10007da6b38695504a25728cf63dc38382cd3eb378231d65285822799c81e33e16314a8a0d9a2e4259ac1725d6003b4f0c8e54cadc889380"
+    },
+    {
+      "body": {
+        "valid_until": 1893456000
+      },
+      "canonical": "{\"valid_until\":1893456000}",
+      "op": "renew_anchor",
+      "payload": "renew_anchor\n{\"valid_until\":1893456000}",
+      "signature_hex": "9c67d32fa0c07ff14624144cb01aad91d13a0e824bfeeef677d0926ad4a7e06a964541a8fc6fa9d1c672208ee2b2e061b61d7b2ec75989ff7ad8b051585be883"
+    },
+    {
+      "body": {
+        "controller_did": "did:web:new.example.com"
+      },
+      "canonical": "{\"controller_did\":\"did:web:new.example.com\"}",
+      "op": "update_controller_did",
+      "payload": "update_controller_did\n{\"controller_did\":\"did:web:new.example.com\"}",
+      "signature_hex": "d490ab057a691673d652cce103be0c0e70ccc729111d2c89f97b7964a3e4ca0466e641d6176b56526401a74964444b05dfc5a1e0f7dad4c0492985c7e7cc9489"
+    }
+  ]
+}

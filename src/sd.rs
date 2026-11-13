@@ -112,10 +112,6 @@ pub fn disclosure_digest(disclosure: &SdDisclosure) -> Result<String, ChainSdkEr
         .map_err(crate::did_adapter::map_did_err)
 }
 
-fn blake2b_hex(bytes: &[u8]) -> String {
-    hex::encode(keyvault_core::crypto::blake2::blake2b256(bytes))
-}
-
 fn sha256_hex(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
@@ -126,20 +122,18 @@ fn compact<T: Serialize>(value: &T) -> Result<Vec<u8>, ChainSdkError> {
 }
 
 /// `payload_hash` for anchoring: VC without `proof` and `anchor_id`.
+///
+/// Delegates to `did_sdk::anchor_payload_hash` so the two SDKs cannot drift.
 pub fn payload_hash(credential: &did_sdk::VerifiableCredential) -> Result<String, ChainSdkError> {
-    let mut payload = credential.clone();
-    payload.proof = None;
-    payload.anchor_id = None;
-    Ok(format!("blake2b:{}", blake2b_hex(&compact(&payload)?)))
+    did_sdk::anchor_payload_hash(credential).map_err(crate::did_adapter::map_did_err)
 }
 
 /// `IssuedVc-v1` signing input (must match `did-sdk` `verify_vc`).
 pub fn vc_signing_input(
     credential: &did_sdk::VerifiableCredential,
 ) -> Result<Vec<u8>, ChainSdkError> {
-    let mut unsigned = credential.clone();
-    unsigned.proof = None;
-    let hash = blake2b_hex(&compact(&unsigned)?);
+    let hash =
+        did_sdk::vc_hash_without_proof(credential).map_err(crate::did_adapter::map_did_err)?;
     let subject = credential
         .credential_subject
         .get("id")
@@ -169,7 +163,7 @@ pub fn vp_signing_input(
     let disclosures_hash = sha256_hex(&compact(&disclosures.to_vec())?);
     let mut vc_hashes = Vec::with_capacity(credentials.len());
     for credential in credentials {
-        vc_hashes.push(blake2b_hex(&compact(credential)?));
+        vc_hashes.push(did_sdk::vc_hash(credential).map_err(crate::did_adapter::map_did_err)?);
     }
     Ok(vp_sd_v1(
         holder,

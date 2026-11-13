@@ -14,7 +14,6 @@ use futures::{SinkExt, StreamExt};
 use reqwest::{Client, StatusCode, Url};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use crate::events::SubscriptionTable;
 use crate::role_gate::RoleGate;
@@ -155,7 +154,7 @@ impl CentralizedChainSdk {
             .as_ref()
             .ok_or_else(|| ChainSdkError::SignerUnavailable("keys not loaded".into()))?;
 
-        let canonical = canonical_json(body)?;
+        let canonical = crate::canonical::canonical_json(body)?;
         let mut payload = Vec::with_capacity(op.len() + 1 + canonical.len());
         payload.extend_from_slice(op.as_bytes());
         payload.push(b'\n');
@@ -178,40 +177,6 @@ impl CentralizedChainSdk {
     }
 }
 
-/// 写请求的 canonical JSON：对象键递归升序、紧凑、拒绝浮点（附录 C.3）。
-fn canonical_json<T: Serialize>(value: &T) -> Result<Vec<u8>, ChainSdkError> {
-    let value = serde_json::to_value(value)
-        .map_err(|error| ChainSdkError::InvalidArgument(format!("canonical JSON: {error}")))?;
-    let canonical = canonicalize(value)?;
-    serde_json::to_vec(&canonical)
-        .map_err(|error| ChainSdkError::InvalidArgument(format!("canonical JSON: {error}")))
-}
-
-fn canonicalize(value: Value) -> Result<Value, ChainSdkError> {
-    match value {
-        Value::Object(map) => {
-            let mut entries: Vec<(String, Value)> = map.into_iter().collect();
-            entries.sort_by(|left, right| left.0.cmp(&right.0));
-            let mut sorted = serde_json::Map::new();
-            for (key, value) in entries {
-                sorted.insert(key, canonicalize(value)?);
-            }
-            Ok(Value::Object(sorted))
-        }
-        Value::Array(items) => {
-            let mut canonical = Vec::with_capacity(items.len());
-            for item in items {
-                canonical.push(canonicalize(item)?);
-            }
-            Ok(Value::Array(canonical))
-        }
-        Value::Number(number) if number.is_f64() => Err(ChainSdkError::InvalidArgument(
-            "canonical JSON rejects floating point numbers".into(),
-        )),
-        other => Ok(other),
-    }
-}
-
 #[derive(Serialize)]
 struct CreateAnchorBody<'a> {
     anchor_type: &'a AnchorType,
@@ -224,12 +189,137 @@ struct CreateAnchorResponse {
     anchor_id: String,
 }
 
+const MAX_ERROR_BODY: usize = 16 * 1024;
+
+#[derive(Debug, Deserialize)]
+struct ServerErrorBody {
+    code: String,
+    #[serde(default)]
+    message: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    request_id: Option<String>,
+    #[serde(default)]
+    details: Option<serde_json::Value>,
+}
+
+#[derive(Debug)]
+struct ServerError {
+    code: String,
+    message: String,
+    details: Option<serde_json::Value>,
+}
+
+/// Context used to fill identifiers that are not present in the server body.
+#[derive(Debug, Default, Clone, Copy)]
+struct ErrorContext<'a> {
+    anchor_id: Option<&'a str>,
+    participant_id: Option<u32>,
+}
+
+async fn parse_server_error(mut response: reqwest::Response) -> Option<ServerError> {
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_ERROR_BODY as u64)
+    {
+        return None;
+    }
+    let mut body = Vec::new();
+    while let Ok(Some(chunk)) = response.chunk().await {
+        let remaining = MAX_ERROR_BODY.saturating_sub(body.len());
+        if remaining == 0 {
+            break;
+        }
+        let take = chunk.len().min(remaining);
+        body.extend_from_slice(&chunk[..take]);
+        if body.len() >= MAX_ERROR_BODY {
+            break;
+        }
+    }
+    let parsed: ServerErrorBody = serde_json::from_slice(&body).ok()?;
+    if parsed.code.trim().is_empty() {
+        return None;
+    }
+    Some(ServerError {
+        code: parsed.code,
+        message: parsed.message,
+        details: parsed.details,
+    })
+}
+
+fn map_server_code(error: &ServerError, context: ErrorContext<'_>) -> Option<ChainSdkError> {
+    let message = if error.message.is_empty() {
+        error.code.clone()
+    } else {
+        error.message.clone()
+    };
+    match error.code.as_str() {
+        "ANCHOR_NOT_FOUND" => Some(ChainSdkError::AnchorNotFound(
+            context.anchor_id.unwrap_or(message.as_str()).to_string(),
+        )),
+        "ANCHOR_PERMANENT" => Some(ChainSdkError::AnchorPermanent(
+            context.anchor_id.unwrap_or(message.as_str()).to_string(),
+        )),
+        "ANCHOR_REVOKED" => Some(ChainSdkError::AnchorRevoked(
+            context.anchor_id.unwrap_or(message.as_str()).to_string(),
+        )),
+        "ANCHOR_TYPE_NOT_REGISTERED" => {
+            let anchor_type = error
+                .details
+                .as_ref()
+                .and_then(|details| details.get("anchor_type"))
+                .and_then(|value| serde_json::from_value::<AnchorType>(value.clone()).ok());
+            Some(match anchor_type {
+                Some(anchor_type) => ChainSdkError::AnchorTypeNotRegistered(anchor_type),
+                None => ChainSdkError::InvalidArgument(message),
+            })
+        }
+        "PARTICIPANT_NOT_FOUND" => Some(match context.participant_id {
+            Some(id) => ChainSdkError::ParticipantNotFound(id),
+            None => ChainSdkError::InvalidArgument(message),
+        }),
+        "PARTICIPANT_INACTIVE" => Some(match context.participant_id {
+            Some(id) => ChainSdkError::ParticipantInactive(id),
+            None => ChainSdkError::InvalidArgument(message),
+        }),
+        "UNAUTHORIZED"
+        | "NOT_CHAIN_OWNER"
+        | "INVALID_SIGNATURE"
+        | "INVALID_DID_SIGNATURE"
+        | "INVALID_OPERATOR_SIGNATURE"
+        | "INVALID_DELEGATION_SIGNATURE"
+        | "ISSUER_NOT_AUTHORIZED" => Some(ChainSdkError::Unauthorized(message)),
+        "PARTICIPANT_ALREADY_EXISTS"
+        | "DID_ALREADY_BOUND"
+        | "OPERATOR_ALREADY_BOUND"
+        | "CONFLICT"
+        | "INVALID_ARGUMENT" => Some(ChainSdkError::InvalidArgument(message)),
+        "INTERNAL" | "UNAVAILABLE" => Some(ChainSdkError::ChainUnavailable(message)),
+        _ => None,
+    }
+}
+
+async fn map_server_error(
+    response: reqwest::Response,
+    op: &str,
+    context: ErrorContext<'_>,
+) -> ChainSdkError {
+    let status = response.status();
+    if let Some(error) = parse_server_error(response).await {
+        if let Some(mapped) = map_server_code(&error, context) {
+            return mapped;
+        }
+    }
+    status_error(status, op)
+}
+
 async fn parse_json<T: DeserializeOwned>(
     response: reqwest::Response,
     op: &str,
+    context: ErrorContext<'_>,
 ) -> Result<T, ChainSdkError> {
     if !response.status().is_success() {
-        return Err(status_error(response.status(), op));
+        return Err(map_server_error(response, op, context).await);
     }
     response
         .json::<T>()
@@ -237,11 +327,15 @@ async fn parse_json<T: DeserializeOwned>(
         .map_err(|error| ChainSdkError::NetworkError(format!("{op}: invalid JSON: {error}")))
 }
 
-async fn ensure_success(response: reqwest::Response, op: &str) -> Result<(), ChainSdkError> {
+async fn ensure_success(
+    response: reqwest::Response,
+    op: &str,
+    context: ErrorContext<'_>,
+) -> Result<(), ChainSdkError> {
     if response.status().is_success() {
         Ok(())
     } else {
-        Err(status_error(response.status(), op))
+        Err(map_server_error(response, op, context).await)
     }
 }
 
@@ -409,7 +503,8 @@ impl ChainSdk for CentralizedChainSdk {
         let response = self
             .signed_post("create_anchor", &["anchors"], &body)
             .await?;
-        let created: CreateAnchorResponse = parse_json(response, "create_anchor").await?;
+        let created: CreateAnchorResponse =
+            parse_json(response, "create_anchor", ErrorContext::default()).await?;
         Ok(created.anchor_id)
     }
 
@@ -422,10 +517,15 @@ impl ChainSdk for CentralizedChainSdk {
                 &serde_json::json!({}),
             )
             .await?;
-        if response.status() == StatusCode::CONFLICT {
-            return Err(ChainSdkError::AnchorRevoked(anchor_id.to_string()));
-        }
-        ensure_success(response, "revoke_anchor").await?;
+        ensure_success(
+            response,
+            "revoke_anchor",
+            ErrorContext {
+                anchor_id: Some(anchor_id),
+                ..Default::default()
+            },
+        )
+        .await?;
         self.invalidate_anchor(anchor_id).await;
         Ok(())
     }
@@ -443,10 +543,15 @@ impl ChainSdk for CentralizedChainSdk {
                 &serde_json::json!({ "valid_until": new_valid_until }),
             )
             .await?;
-        if response.status() == StatusCode::CONFLICT {
-            return Err(ChainSdkError::AnchorRevoked(anchor_id.to_string()));
-        }
-        ensure_success(response, "renew_anchor").await?;
+        ensure_success(
+            response,
+            "renew_anchor",
+            ErrorContext {
+                anchor_id: Some(anchor_id),
+                ..Default::default()
+            },
+        )
+        .await?;
         self.invalidate_anchor(anchor_id).await;
         Ok(())
     }
@@ -464,7 +569,15 @@ impl ChainSdk for CentralizedChainSdk {
                 &serde_json::json!({ "domains": domains }),
             )
             .await?;
-        ensure_success(response, "update_authorized_domains").await
+        ensure_success(
+            response,
+            "update_authorized_domains",
+            ErrorContext {
+                participant_id: Some(participant_id),
+                ..Default::default()
+            },
+        )
+        .await
     }
 
     async fn update_controller_did(
@@ -484,7 +597,15 @@ impl ChainSdk for CentralizedChainSdk {
                 &serde_json::json!({ "controller_did": new_controller_did }),
             )
             .await?;
-        ensure_success(response, "update_controller_did").await
+        ensure_success(
+            response,
+            "update_controller_did",
+            ErrorContext {
+                participant_id: Some(participant_id),
+                ..Default::default()
+            },
+        )
+        .await
     }
 
     async fn sign_participant_assertion(
@@ -574,20 +695,4 @@ fn start_event_stream(endpoint: String, table: Arc<SubscriptionTable>) {
             runtime.block_on(run_event_stream(endpoint, table));
         }
     });
-}
-
-#[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used)]
-
-    use super::canonical_json;
-
-    #[test]
-    fn canonical_json_sorts_keys_and_rejects_floats() {
-        let bytes =
-            canonical_json(&serde_json::json!({ "b": 1, "a": { "d": 4, "c": 3 } })).unwrap();
-        assert_eq!(bytes, br#"{"a":{"c":3,"d":4},"b":1}"#);
-
-        assert!(canonical_json(&serde_json::json!({ "x": 1.5 })).is_err());
-    }
 }

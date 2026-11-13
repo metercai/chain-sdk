@@ -3,8 +3,8 @@
 | Item | Value |
 |---|---|
 | Document | ChainSdk interface contract and implementation specification (initial release) |
-| Package | `chain-sdk` v0.1.0 |
-| Status | Implemented and released; 96 tests passing; CI green |
+| Package | `chain-sdk` v0.1.1 |
+| Status | Implemented and released (v0.1.1); 122 tests passing; CI green |
 | Audience | Service-side Rust applications (gateways, issuers, verifiers), `chain-owner-sdk`, `did-sdk` maintainers |
 | Normative | This document is the single source of truth for the contract. Any change follows §13. |
 
@@ -324,6 +324,28 @@ All writes and assertion signing MUST call the gate **before any backend logic o
 
 ---
 
+### 4.5 Vault injection (host integration)
+
+A host that must use the same keys (for example `chain-owner-sdk` governance signing) can open
+the vault once and inject it. The SDK then never opens a second keystore.
+
+| Function | Behaviour |
+|---|---|
+| `build_key_vault(&cfg)` | Opens/constructs the vault described by the config (`file-keystore` needs a resolved password; `memory-keystore` is fresh; unknown scheme → `ConfigError`). |
+| `build_chain_sdk_with_vault(&cfg, vault)` | Builds the selected backend with the supplied vault. |
+| `build_mock_chain_sdk_with_vault`, `build_centralized_chain_sdk_with_vault`, `build_chain_mode_sdk_with_vault` | Concrete-type variants. |
+
+Rules:
+
+- `role` must be `Issuer`; `Verifier + vault` returns
+  `ConfigError("vault injection requires role issuer")` (never silently ignored).
+- `config.key_vault.keys` still selects the two `KeyId`s and is prefix-validated; in injection
+  mode `scheme` / `path` / `password_file` are not used to open storage.
+- The injected `Arc<dyn KeyVault>` is used as-is. Namespace checks and the two signing entry
+  points are unchanged.
+
+---
+
 ## 5. Backend Behaviour
 
 ### 5.1 `Mock`
@@ -335,6 +357,13 @@ All writes and assertion signing MUST call the gate **before any backend logic o
   plus `set_chain_unavailable(true)`.
 - Events emitted: `AnchorCreated`, `AnchorRevoked`, `AnchorRenewed`, `ParticipantUpdated`.
 - `created_at` uses the internal time line (`advance_time`).
+- **Shared state (v0.1.1).** `MockChainSdk` owns a `MockStateHandle`
+  (`Arc<RwLock<MockState>>`). `state_handle()` returns a clone that shares the same state;
+  `MockStateHandle::update(|state| ...)` performs an atomic synchronous mutation and
+  `persist()` writes the current state to `mock.state_path`. Use
+  `build_mock_chain_sdk_with_state_handle[_and_vault]` to construct with a caller-owned handle.
+- External writes made through the handle **do not emit events** in v0.1.1; the host must call
+  `persist()` explicitly. Events emitted by SDK methods themselves are unchanged.
 
 ### 5.2 `Centralized`
 
@@ -382,8 +411,47 @@ numbers are rejected**. `op` values are the method names above.
 Connection is established lazily on the first subscription, reconnects with a 1 s delay, and stays
 open for the process lifetime. Unsubscribing removes the callback only.
 
-**Error mapping.** 401/403 → `Unauthorized`; 409 → `InvalidArgument` (revoke/renew → `AnchorRevoked`);
-5xx → `ChainUnavailable`; other non-success → `NetworkError`; 404 handled per endpoint.
+**Canonical JSON.** `chain_sdk::canonical_json` is public and is the single implementation used
+for signing. Rules: recursive ascending object keys, arrays keep order, compact separators, UTF-8,
+and **floating point numbers are rejected**. Servers must reproduce these bytes exactly:
+
+```text
+payload = op || "\n" || canonical_json(body)
+```
+
+**Error body.** Every write error is parsed as:
+
+```json
+{ "code": "ANCHOR_PERMANENT", "message": "...", "request_id": "...", "details": { } }
+```
+
+The body is read with a **16 KiB limit**; if it is missing, too large, non-JSON, or the code is
+unknown, the SDK falls back to status-code mapping. `404` is handled per endpoint exactly as
+before (`get_anchor` → `AnchorNotFound`, `get_participant` → `ParticipantNotFound`,
+`get_participant_by_did` / `resolve_did` → `Ok(None)`).
+
+| Server `code` | `ChainSdkError` |
+|---|---|
+| `ANCHOR_NOT_FOUND` | `AnchorNotFound(anchor_id)` |
+| `ANCHOR_PERMANENT` | `AnchorPermanent(anchor_id)` |
+| `ANCHOR_REVOKED` | `AnchorRevoked(anchor_id)` |
+| `ANCHOR_TYPE_NOT_REGISTERED` | `AnchorTypeNotRegistered(details.anchor_type)` when present, else `InvalidArgument` |
+| `PARTICIPANT_NOT_FOUND` | `ParticipantNotFound(participant_id)` |
+| `PARTICIPANT_INACTIVE` | `ParticipantInactive(participant_id)` |
+| `UNAUTHORIZED`, `NOT_CHAIN_OWNER`, `INVALID_SIGNATURE`, `INVALID_DID_SIGNATURE`, `INVALID_OPERATOR_SIGNATURE`, `INVALID_DELEGATION_SIGNATURE`, `ISSUER_NOT_AUTHORIZED` | `Unauthorized(message)` |
+| `PARTICIPANT_ALREADY_EXISTS`, `DID_ALREADY_BOUND`, `OPERATOR_ALREADY_BOUND`, `CONFLICT`, `INVALID_ARGUMENT` | `InvalidArgument(message)` |
+| `INTERNAL`, `UNAVAILABLE` | `ChainUnavailable(message)` |
+| unknown / non-JSON | status-code fallback: 401/403 → `Unauthorized`; 409 → `InvalidArgument`; 5xx → `ChainUnavailable`; other → `NetworkError` |
+
+`revoke_anchor`: 409 + `ANCHOR_REVOKED` → `AnchorRevoked`; other 409 → `InvalidArgument`.
+`renew_anchor`: 409 + `ANCHOR_PERMANENT` → `AnchorPermanent`; 409 + `ANCHOR_REVOKED` →
+`AnchorRevoked`; other 409 → `InvalidArgument`.
+
+**Wire fixtures.** [`tests/fixtures/centralized_wire.json`](../tests/fixtures/centralized_wire.json)
+contains reproducible `create_anchor`, `renew_anchor` and `update_controller_did` vectors
+(`body`, `canonical`, `payload`, `signature_hex`, `public_key_hex`, `signer`). They are verified
+byte-for-byte by `tests/centralized_wire_fixtures.rs` and can be used by the server's
+compatibility tests.
 
 ### 5.3 `Chain` (subxt POC)
 
@@ -638,6 +706,25 @@ value so that configuration can be inspected without building.
 
 ---
 
+### 8.3 Host integration APIs (v0.1.1)
+
+All items below are re-exported from the crate root (`chain_sdk::...`).
+
+| API | Purpose |
+|---|---|
+| `build_key_vault(&cfg)` | Open/construct a `KeyVault` once. |
+| `build_chain_sdk_with_vault(&cfg, vault)` | Build `Arc<dyn ChainSdk>` with an injected vault. |
+| `build_mock_chain_sdk_with_vault`, `build_centralized_chain_sdk_with_vault`, `build_chain_mode_sdk_with_vault` | Concrete backends with an injected vault. |
+| `MockStateHandle::new(state)`, `snapshot()`, `update(..)` | Shared Mock state (`Arc<RwLock<MockState>>`). |
+| `MockChainSdk::state_handle()`, `persist()` | Share state / persist explicitly. |
+| `build_mock_chain_sdk_with_state_handle(&cfg, handle)` | Mock backend sharing caller state. |
+| `build_mock_chain_sdk_with_state_handle_and_vault(&cfg, handle, vault)` | Mock backend sharing state **and** vault. |
+| `canonical_json(&value)` | Public canonical JSON for wire signing. |
+
+Existing constructors (`build_chain_sdk`, `build_mock_chain_sdk_with_state`, …) are unchanged.
+
+---
+
 ## 9. Platform and Build
 
 ### 9.1 Targets
@@ -658,7 +745,7 @@ Cross-compilation is performed **only on GitHub Actions runners**. Toolchain: Ru
   as the rustls provider (pure Rust + assembly, no system library).
 - Forbidden: `native-tls`, `openssl`, non-bundled `-sys` dependencies.
 - `subxt` exists only in `chain-sdk`; `did-sdk`'s dependency tree must not contain it (R1).
-- `keyvault-core` and `did-sdk` are external git dependencies pinned to tag `v0.2.0`.
+- `keyvault-core` and `did-sdk` are external git dependencies pinned to tag `v0.2.1`.
 - `Cargo.lock` is committed and CI runs with `--locked`.
 
 ### 9.3 CI
@@ -733,7 +820,7 @@ Additional platform criteria:
 | I3 | Independent salts across claims and VCs | `tests/sd_issue.rs` |
 | I4 | Disclosure format `[salt, name, value]` | `tests/sd_issue.rs` |
 | I5 | Anchor hash unchanged (VC with `_sd`, without disclosures) | `tests/sd_issue.rs` |
-| I6 | VC + disclosures delivered together | `did-sdk` v0.2 (`store_vc_with_disclosures`) |
+| I6 | VC + disclosures delivered together | `did-sdk` v0.2.1 (`store_vc_with_disclosures`) |
 | V1 | Holder signature and challenge | `tests/sd_verify.rs` |
 | V2 | Issuer VC signature | `tests/sd_verify.rs` |
 | V3 | Disclosure digest match | `tests/sd_verify.rs` |
@@ -750,10 +837,28 @@ are validated in that repository.
 
 ---
 
-## 12. Implementation Status and Known Limits (v0.1.0)
+### 11.3 Host integration (CS-01–CS-06)
 
-- Local: 96 tests pass; `cargo fmt --check` and `cargo clippy -D warnings` clean.
-- CI: four workflows green on the first `main` push (ci, rust-musl, consistency, roles).
+| ID | Criterion | Evidence |
+|---|---|---|
+| CS-01 | Vault injection reuses one vault; no second keystore; `Verifier + vault` → `ConfigError` | `tests/vault_injection.rs` |
+| CS-02 | Shared `MockStateHandle` writes visible to reads; explicit `persist()`; old constructors unchanged | `tests/mock_shared_state.rs` |
+| CS-03 | 409 `ANCHOR_PERMANENT` / `ANCHOR_REVOKED`; structured codes; bounded body; fallback | `tests/centralized_error_mapping.rs` |
+| CS-04 | Public `canonical_json`; sorting / arrays / floats / UTF-8 / empty containers | `src/canonical.rs` unit tests, `tests/centralized_signing.rs` |
+| CS-05 | `did-sdk` v0.2.1 hashes reused; byte parity for payload / VC / VP / disclosure | `tests/did_sdk_parity.rs` |
+| CS-06 | Wire fixtures verify canonical bytes and signatures | `tests/centralized_wire_fixtures.rs` |
+| CS-07 | Replay protection v2 — **deferred** (not required for v0.1.x) | — |
+| CS-08 | Mock external event injection — **deferred** (host may add later) | — |
+
+---
+
+## 12. Implementation Status and Known Limits (v0.1.1)
+
+- Local: 122 tests pass; `cargo fmt --check` and `cargo clippy -D warnings` clean.
+- CI: four workflows (ci, rust-musl, consistency, roles) run on every `main` push.
+- v0.1.1 adds vault injection, `MockStateHandle`, structured Centralized errors, public
+  `canonical_json`, and `did-sdk` v0.2.1 hash reuse (CS-01–CS-06).
+- CS-07 (write-request nonce) and CS-08 (external Mock events) are intentionally deferred.
 - `Chain` backend: connection, health, events and role gates implemented; storage/extrinsic
   operations return `Unsupported` (see §5.3).
 - Centralized service contract is the one defined in §5.2; it must be confirmed with the

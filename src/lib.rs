@@ -33,6 +33,7 @@
 //! 本提交是**初始化骨架**：公开契约已冻结，后端实现与测试按
 //! `docs/ChainSdk-Interface-Contract.md`。
 
+pub mod canonical;
 pub mod centralized;
 pub mod chain;
 pub mod config;
@@ -50,16 +51,21 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+pub use canonical::canonical_json;
 pub use centralized::CentralizedChainSdk;
 pub use chain::ChainModeSdk;
 pub use config::{
     Capabilities, ChainSdkConfig, ChainSdkMode, ConfigOverrides, DidConfig, KeyVaultConfig,
-    KeyVaultKeys, MockConfig, ParticipantConfig, SdkRole, build_chain_sdk, build_mock_chain_sdk,
-    build_mock_chain_sdk_with_state, resolve_config,
+    KeyVaultKeys, MockConfig, ParticipantConfig, SdkRole, build_centralized_chain_sdk,
+    build_centralized_chain_sdk_with_vault, build_chain_mode_sdk, build_chain_mode_sdk_with_vault,
+    build_chain_sdk, build_chain_sdk_with_vault, build_key_vault, build_mock_chain_sdk,
+    build_mock_chain_sdk_with_state, build_mock_chain_sdk_with_state_handle,
+    build_mock_chain_sdk_with_state_handle_and_vault, build_mock_chain_sdk_with_vault,
+    resolve_config,
 };
 pub use error::ChainSdkError;
 pub use events::{EventData, Unsubscribe};
-pub use mock::{FailureRule, MockChainSdk, MockState};
+pub use mock::{FailureRule, MockChainSdk, MockState, MockStateHandle};
 pub use sd::{
     SdDisclosure, SdExpected, SdIssueRequest, SdIssuedCredential, SdPresentation,
     SdVerificationReport, SelectiveDisclosure,
